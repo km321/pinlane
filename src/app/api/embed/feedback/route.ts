@@ -124,6 +124,8 @@ export async function POST(req: Request) {
           screenshotUrl: result.feedback.screenshotUrl,
           createdAt: result.feedback.createdAt,
           mine: true,
+          status: result.card.status,
+          replies: [],
         },
       },
       { status: 201, headers },

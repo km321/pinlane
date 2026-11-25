@@ -23,6 +23,16 @@ type Branding = {
   showPoweredBy?: boolean;
 };
 
+type BoardStatus = "open" | "in_progress" | "done";
+
+type PinReply = {
+  id: string;
+  authorName: string;
+  authorType?: string;
+  body: string;
+  createdAt?: string;
+};
+
 type PinRecord = {
   id: string;
   authorName: string;
@@ -34,6 +44,8 @@ type PinRecord = {
   createdAt?: string;
   mine?: boolean;
   onThisPage?: boolean;
+  status?: BoardStatus;
+  replies?: PinReply[];
 };
 
 type SessionInfo = {
@@ -501,13 +513,38 @@ type SessionInfo = {
       .panel-empty {
         padding: 24px 12px; text-align: center; color: #5a6e7a; font-size: 13px;
       }
+      .status {
+        display: inline-flex; align-items: center; border-radius: 999px;
+        padding: 2px 8px; font-size: 10px; font-weight: 700; letter-spacing: .02em;
+        text-transform: uppercase;
+      }
+      .status.open { background: #e8f1ff; color: #1d4f91; }
+      .status.in_progress { background: #fff4e5; color: #9a5b00; }
+      .status.done { background: #e7f7ee; color: #0f6b3a; }
+      .replies {
+        margin-top: 8px; padding-top: 8px; border-top: 1px solid #eef2f5;
+        display: flex; flex-direction: column; gap: 6px;
+      }
+      .reply {
+        background: #f6f8fa; border-radius: calc(${radius} * 0.8);
+        padding: 8px 10px; font-size: 12px; line-height: 1.4;
+      }
+      .reply .who {
+        font-size: 10px; font-weight: 700; color: #5a6e7a;
+        margin-bottom: 2px; text-transform: uppercase; letter-spacing: .03em;
+      }
       .pin-tip {
         position: absolute; transform: translate(-50%, calc(-100% - 10px));
         background: ${surface}; color: #0b1f2a; border-radius: ${radius};
-        padding: 8px 10px; min-width: 140px; max-width: 240px;
+        padding: 8px 10px; min-width: 140px; max-width: 260px;
         box-shadow: 0 10px 30px rgba(11,31,42,.25); font-size: 12px; pointer-events: none;
       }
       .pin-tip strong { display: block; margin-bottom: 2px; }
+      .pin-tip .tip-status { margin: 4px 0 6px; }
+      .pin-tip .tip-reply {
+        margin-top: 6px; padding-top: 6px; border-top: 1px solid #eef2f5;
+        color: #5a6e7a; font-size: 11px;
+      }
       .rect {
         position: absolute; border: 2px solid ${color}; background: ${color}33;
         pointer-events: none;
@@ -694,13 +731,46 @@ type SessionInfo = {
       enterBrowseMode();
     }
 
+    function statusLabel(status?: BoardStatus) {
+      switch (status) {
+        case "in_progress":
+          return "In progress";
+        case "done":
+          return "Done";
+        case "open":
+        default:
+          return "Open";
+      }
+    }
+
+    function statusClass(status?: BoardStatus) {
+      if (status === "in_progress" || status === "done") return status;
+      return "open";
+    }
+
+    async function refreshPinsFromServer() {
+      const next = await validate(token);
+      if (!next?.active || !next.pins) return;
+      const current = window.location.href.split("#")[0];
+      pins = next.pins.map((p) => ({
+        ...p,
+        onThisPage:
+          p.onThisPage ?? samePageClient(p.pageUrl, current),
+      }));
+      renderPins();
+      renderNotesPanel();
+    }
+
     function setPanelOpen(open: boolean) {
       panelOpen = open;
       panel.classList.toggle("open", open);
       toolbar
         .querySelector('[data-action="notes"]')
         ?.classList.toggle("active", open);
-      if (open) renderNotesPanel();
+      if (open) {
+        renderNotesPanel();
+        void refreshPinsFromServer();
+      }
     }
 
     let focusedPinId: string | null = focusPinIdFromHash();
@@ -856,10 +926,27 @@ type SessionInfo = {
               renderNotesPanel();
             });
         } else {
+          const replies = pin.replies || [];
+          const repliesHtml =
+            replies.length > 0
+              ? `<div class="replies">${replies
+                  .map(
+                    (r) => `
+                <div class="reply">
+                  <div class="who">${escapeHtml(r.authorName)}${
+                      r.authorType === "member" || r.authorType === "team"
+                        ? " · team"
+                        : ""
+                    }</div>
+                  <div>${escapeHtml(r.body)}</div>
+                </div>`,
+                  )
+                  .join("")}</div>`
+              : "";
           card.innerHTML = `
             <div class="meta">
               <span>${num != null ? `<span class="num">${num}</span>` : ""}${escapeHtml(pin.authorName)}${pin.mine ? " · you" : ""}</span>
-              <span>${pin.highlight.type}</span>
+              <span class="status ${statusClass(pin.status)}">${statusLabel(pin.status)}</span>
             </div>
             <div class="body">${escapeHtml(pin.comment)}</div>
             ${
@@ -867,8 +954,9 @@ type SessionInfo = {
                 ? ""
                 : `<div class="page">${escapeHtml(pin.pageTitle || pin.pageUrl)}</div>`
             }
+            ${repliesHtml}
             ${
-              pin.mine
+              pin.mine && pin.status !== "done"
                 ? `<div class="note-actions">
                     <button type="button" class="edit" data-edit>Edit</button>
                     <button type="button" class="del" data-del>Delete</button>
@@ -948,7 +1036,17 @@ type SessionInfo = {
       tipEl.style.left = `${Math.min(Math.max(80, x), window.innerWidth - 80)}px`;
       tipEl.style.top = `${Math.max(40, y)}px`;
       const num = pinNumber(pin.id);
-      tipEl.innerHTML = `<strong>${num != null ? `#${num} · ` : ""}${escapeHtml(pin.authorName)}</strong>${escapeHtml(pin.comment)}`;
+      const lastReply = (pin.replies || [])[(pin.replies || []).length - 1];
+      tipEl.innerHTML = `
+        <strong>${num != null ? `#${num} · ` : ""}${escapeHtml(pin.authorName)}</strong>
+        <div class="tip-status"><span class="status ${statusClass(pin.status)}">${statusLabel(pin.status)}</span></div>
+        ${escapeHtml(pin.comment)}
+        ${
+          lastReply
+            ? `<div class="tip-reply"><strong>${escapeHtml(lastReply.authorName)}:</strong> ${escapeHtml(lastReply.body)}</div>`
+            : ""
+        }
+      `;
       pinsLayer.appendChild(tipEl);
       window.setTimeout(() => {
         if (tipPinId === pin.id) {
@@ -1184,8 +1282,8 @@ type SessionInfo = {
         target: '[data-mode="rect"]',
       },
       {
-        title: "Notes sidebar",
-        body: "Open Notes anytime to see everyone’s feedback, jump to a pin, and edit or delete your own.",
+        title: "Notes, replies & status",
+        body: "Open Notes to see every pin, the stage it’s in (Open / In progress / Done), and replies from the team. Fresh updates load when you open the panel.",
         target: '[data-action="notes"]',
       },
     ];

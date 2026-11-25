@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server";
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import {
   feedbackItems,
+  feedbackReplies,
   projects,
   reviewInvites,
   reviewSessions,
   workspaces,
+  type BoardStatus,
 } from "@/db/schema";
 import { brandingFromWorkspace } from "@/lib/branding";
 import { embedCorsHeaders, optionsResponse } from "@/lib/cors";
@@ -77,6 +79,12 @@ export async function GET(req: Request) {
     where: eq(feedbackItems.projectId, project.id),
     orderBy: [desc(feedbackItems.createdAt)],
     limit: 200,
+    with: {
+      boardCard: true,
+      replies: {
+        orderBy: [asc(feedbackReplies.createdAt)],
+      },
+    },
   });
 
   const mapped = allPins.map((pin) => ({
@@ -90,6 +98,14 @@ export async function GET(req: Request) {
     createdAt: pin.createdAt,
     mine: pin.sessionId === session.id,
     onThisPage: pageUrl ? samePage(pin.pageUrl, pageUrl) : true,
+    status: (pin.boardCard?.status as BoardStatus) || "open",
+    replies: pin.replies.map((r) => ({
+      id: r.id,
+      authorName: r.authorName,
+      authorType: r.authorType,
+      body: r.body,
+      createdAt: r.createdAt,
+    })),
   }));
 
   return NextResponse.json(
