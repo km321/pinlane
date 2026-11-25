@@ -89,7 +89,7 @@ export function ProjectSetup({
         <p className="mt-1 text-sm text-muted-foreground">
           Paste this on {siteUrl} (usually before {"</body>"}).
         </p>
-        <pre className="mt-4 overflow-x-auto rounded-xl bg-[#0b1f2a] p-4 text-xs text-white">
+        <pre className="mt-4 overflow-x-auto whitespace-pre-wrap break-all rounded-xl bg-[#0b1f2a] p-4 text-xs text-white">
           {snippet}
         </pre>
         <Button

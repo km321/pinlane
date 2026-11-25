@@ -33,7 +33,9 @@ export const auth = betterAuth({
   trustedOrigins: [
     process.env.BETTER_AUTH_URL ||
       process.env.NEXT_PUBLIC_APP_URL ||
-      "http://127.0.0.1:3456",
+      "http://localhost:3456",
+    "http://127.0.0.1:3456",
+    "http://localhost:3456",
   ],
 });
 
