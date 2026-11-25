@@ -137,6 +137,52 @@ export async function addReply(opts: {
   return reply;
 }
 
+export async function updateGuestFeedback(opts: {
+  feedbackId: string;
+  sessionId: string;
+  projectId: string;
+  comment: string;
+}) {
+  const item = await db.query.feedbackItems.findFirst({
+    where: eq(feedbackItems.id, opts.feedbackId),
+  });
+  if (
+    !item ||
+    item.projectId !== opts.projectId ||
+    item.sessionId !== opts.sessionId
+  ) {
+    return null;
+  }
+
+  const [updated] = await db
+    .update(feedbackItems)
+    .set({ comment: opts.comment })
+    .where(eq(feedbackItems.id, opts.feedbackId))
+    .returning();
+
+  return updated;
+}
+
+export async function deleteGuestFeedback(opts: {
+  feedbackId: string;
+  sessionId: string;
+  projectId: string;
+}) {
+  const item = await db.query.feedbackItems.findFirst({
+    where: eq(feedbackItems.id, opts.feedbackId),
+  });
+  if (
+    !item ||
+    item.projectId !== opts.projectId ||
+    item.sessionId !== opts.sessionId
+  ) {
+    return null;
+  }
+
+  await db.delete(feedbackItems).where(eq(feedbackItems.id, opts.feedbackId));
+  return true;
+}
+
 export async function createFeedbackWithCard(opts: {
   projectId: string;
   sessionId?: string;

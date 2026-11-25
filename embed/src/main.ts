@@ -28,9 +28,12 @@ type PinRecord = {
   authorName: string;
   comment: string;
   pageUrl: string;
+  pageTitle?: string | null;
   highlight: PinHighlight;
   screenshotUrl?: string | null;
+  createdAt?: string;
   mine?: boolean;
+  onThisPage?: boolean;
 };
 
 type SessionInfo = {
@@ -306,15 +309,82 @@ type SessionInfo = {
         position: fixed; inset: 0; z-index: 2147483644; pointer-events: none;
       }
       .pin-marker {
-        position: absolute; width: 22px; height: 22px; border-radius: 50%;
+        position: absolute; min-width: 24px; height: 24px; padding: 0 6px;
+        border-radius: 999px; display: flex; align-items: center; justify-content: center;
         background: ${color}; border: 2px solid #fff; transform: translate(-50%, -50%);
         box-shadow: 0 4px 12px rgba(0,0,0,.25); pointer-events: auto; cursor: pointer;
+        color: #fff; font-size: 11px; font-weight: 700; line-height: 1;
       }
       .pin-marker.mine { outline: 2px solid #fff; outline-offset: 2px; }
-      .pin-marker.focused { transform: translate(-50%, -50%) scale(1.25); }
+      .pin-marker.focused { transform: translate(-50%, -50%) scale(1.2); z-index: 2; }
       .rect-marker {
         position: absolute; border: 2px solid ${color}; background: ${color}33;
         pointer-events: auto; cursor: pointer;
+      }
+      .rect-badge {
+        position: absolute; left: 0; top: 0; transform: translate(-30%, -50%);
+        min-width: 22px; height: 22px; padding: 0 6px; border-radius: 999px;
+        background: ${color}; color: #fff; border: 2px solid #fff;
+        font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center;
+      }
+      .panel {
+        position: fixed; top: 0; right: 0; bottom: 0; z-index: 2147483646;
+        width: min(360px, 100vw); background: ${surface}; color: #0b1f2a;
+        box-shadow: -12px 0 40px rgba(11,31,42,.2);
+        transform: translateX(105%); transition: transform .22s ease;
+        display: flex; flex-direction: column; pointer-events: auto;
+      }
+      .panel.open { transform: translateX(0); }
+      .panel-header {
+        display: flex; align-items: center; justify-content: space-between; gap: 8px;
+        padding: 14px 16px; background: ${sidebar}; color: #fff;
+      }
+      .panel-header h2 { margin: 0; font-size: 15px; font-weight: 700; }
+      .panel-header button {
+        border: 0; background: rgba(255,255,255,.12); color: #fff;
+        border-radius: calc(${radius} * 2); padding: 6px 10px; cursor: pointer; font-weight: 600;
+      }
+      .panel-filters {
+        display: flex; gap: 6px; padding: 10px 12px; border-bottom: 1px solid #e4ebf0;
+      }
+      .panel-filters button {
+        border: 0; border-radius: calc(${radius} * 2); padding: 6px 10px; cursor: pointer;
+        background: #eef2f5; color: #0b1f2a; font-size: 12px; font-weight: 600;
+      }
+      .panel-filters button.active { background: ${color}; color: #fff; }
+      .panel-list { flex: 1; overflow: auto; padding: 8px; }
+      .note {
+        border: 1px solid #e4ebf0; border-radius: ${radius}; padding: 10px;
+        margin-bottom: 8px; background: #fff; text-align: left; width: 100%;
+        cursor: pointer; font: inherit; color: inherit;
+      }
+      .note.active { border-color: ${color}; box-shadow: 0 0 0 1px ${color}; }
+      .note .meta {
+        display: flex; justify-content: space-between; gap: 8px;
+        font-size: 11px; color: #5a6e7a; margin-bottom: 4px;
+      }
+      .note .num {
+        display: inline-flex; align-items: center; justify-content: center;
+        min-width: 18px; height: 18px; border-radius: 999px; background: ${color};
+        color: #fff; font-size: 10px; font-weight: 700; margin-right: 6px;
+      }
+      .note .body { font-size: 13px; line-height: 1.4; white-space: pre-wrap; }
+      .note .page { margin-top: 6px; font-size: 11px; color: #8a9aa5; }
+      .note-actions { display: flex; gap: 6px; margin-top: 8px; }
+      .note-actions button {
+        border: 0; border-radius: calc(${radius} * 1.5); padding: 6px 10px;
+        font-size: 12px; font-weight: 600; cursor: pointer;
+      }
+      .note-actions .edit { background: #eef2f5; }
+      .note-actions .del { background: #fdeceb; color: #c23b2e; }
+      .note-actions .save { background: ${color}; color: #fff; }
+      .note textarea {
+        width: 100%; min-height: 72px; margin-top: 6px; resize: vertical;
+        border: 1px solid #d7dee5; border-radius: calc(${radius} * 0.8);
+        padding: 8px; font: inherit;
+      }
+      .panel-empty {
+        padding: 24px 12px; text-align: center; color: #5a6e7a; font-size: 13px;
       }
       .pin-tip {
         position: absolute; transform: translate(-50%, calc(-100% - 10px));
@@ -401,10 +471,28 @@ type SessionInfo = {
       <span class="guest">${info.guestName || "Reviewer"}</span>
       <button class="btn" data-mode="pin" type="button">Comment</button>
       <button class="btn" data-mode="rect" type="button">Highlight</button>
+      <button class="btn" data-action="notes" type="button">Notes</button>
       <button class="btn" data-action="tour" type="button" title="Quick tour">?</button>
       <button class="btn" data-action="exit" type="button">Exit</button>
     `;
     shadow.appendChild(toolbar);
+
+    const panel = document.createElement("aside");
+    panel.className = "panel";
+    panel.innerHTML = `
+      <div class="panel-header">
+        <h2>Notes</h2>
+        <button type="button" data-close-panel>Close</button>
+      </div>
+      <div class="panel-filters">
+        <button type="button" data-filter="page" class="active">This page</button>
+        <button type="button" data-filter="all">All pages</button>
+        <button type="button" data-filter="mine">Mine</button>
+      </div>
+      <div class="panel-list"></div>
+    `;
+    shadow.appendChild(panel);
+    const panelList = panel.querySelector(".panel-list") as HTMLDivElement;
 
     if (showPoweredBy) {
       const powered = document.createElement("div");
@@ -417,8 +505,44 @@ type SessionInfo = {
     let overlay: HTMLDivElement | null = null;
     let dragStart: { x: number; y: number } | null = null;
     let draftRect: HTMLDivElement | null = null;
-    let pins: PinRecord[] = [...(info.pins || [])];
+    let pins: PinRecord[] = [...(info.pins || [])].map((p) => ({
+      ...p,
+      onThisPage:
+        p.onThisPage ??
+        samePageClient(p.pageUrl, window.location.href.split("#")[0]),
+    }));
     let tipEl: HTMLDivElement | null = null;
+    let notesFilter: "page" | "all" | "mine" = "page";
+    let panelOpen = false;
+    let editingId: string | null = null;
+    let selectedId: string | null = null;
+
+    function samePageClient(a: string, b: string) {
+      try {
+        const ua = new URL(a);
+        const ub = new URL(b);
+        return (
+          ua.origin === ub.origin &&
+          ua.pathname.replace(/\/$/, "") === ub.pathname.replace(/\/$/, "")
+        );
+      } catch {
+        return a.split("#")[0].split("?")[0] === b.split("#")[0].split("?")[0];
+      }
+    }
+
+    function pagePins() {
+      return pins.filter((p) =>
+        samePageClient(p.pageUrl, window.location.href.split("#")[0]),
+      );
+    }
+
+    function pinNumber(id: string) {
+      const ordered = [...pagePins()].sort((a, b) =>
+        String(a.createdAt || "").localeCompare(String(b.createdAt || "")),
+      );
+      const idx = ordered.findIndex((p) => p.id === id);
+      return idx >= 0 ? idx + 1 : null;
+    }
 
     function toast(msg: string) {
       const el = document.createElement("div");
@@ -439,48 +563,78 @@ type SessionInfo = {
         .forEach((b) => b.classList.remove("active"));
     }
 
+    function setPanelOpen(open: boolean) {
+      panelOpen = open;
+      panel.classList.toggle("open", open);
+      toolbar
+        .querySelector('[data-action="notes"]')
+        ?.classList.toggle("active", open);
+      if (open) renderNotesPanel();
+    }
+
     let focusedPinId: string | null = focusPinIdFromHash();
     let tipPinId: string | null = null;
+
+    function focusPin(pin: PinRecord, openPanel = false) {
+      selectedId = pin.id;
+      tipPinId = pin.id;
+      const { docH } = docSize();
+      window.scrollTo({
+        top: Math.max(0, pin.highlight.y * docH - window.innerHeight / 2),
+        behavior: "smooth",
+      });
+      renderPins();
+      renderNotesPanel();
+      if (openPanel) setPanelOpen(true);
+      const box = resolveViewportBox(pin.highlight);
+      showTip(
+        pin,
+        pin.highlight.type === "pin" ? box.left : box.left + box.width / 2,
+        box.top,
+      );
+    }
 
     function renderPins(focusId?: string | null) {
       if (focusId !== undefined) focusedPinId = focusId;
       pinsLayer.innerHTML = "";
       tipEl = null;
 
-      for (const pin of pins) {
+      // Markers stay on the live page at all times for notes on this page.
+      for (const pin of pagePins()) {
         const box = resolveViewportBox(pin.highlight);
-        const offscreen =
-          box.top < -80 ||
-          box.left < -80 ||
-          box.top > window.innerHeight + 80 ||
-          box.left > window.innerWidth + 80;
+        const num = pinNumber(pin.id);
+        const isFocused =
+          selectedId === pin.id ||
+          tipPinId === pin.id ||
+          focusedPinId === pin.id;
 
         if (pin.highlight.type === "pin") {
           const marker = document.createElement("div");
-          marker.className = `pin-marker${pin.mine ? " mine" : ""}${focusedPinId === pin.id ? " focused" : ""}`;
+          marker.className = `pin-marker${pin.mine ? " mine" : ""}${isFocused ? " focused" : ""}`;
           marker.style.left = `${box.left}px`;
           marker.style.top = `${box.top}px`;
-          marker.style.display = offscreen ? "none" : "";
+          marker.textContent = num != null ? String(num) : "•";
           marker.title = `${pin.authorName}: ${pin.comment}`;
           marker.addEventListener("click", (e) => {
             e.stopPropagation();
-            tipPinId = pin.id;
-            showTip(pin, box.left, box.top);
+            focusPin(pin, true);
           });
           pinsLayer.appendChild(marker);
         } else {
           const marker = document.createElement("div");
-          marker.className = "rect-marker";
+          marker.className = `rect-marker${isFocused ? " focused" : ""}`;
           marker.style.left = `${box.left}px`;
           marker.style.top = `${box.top}px`;
           marker.style.width = `${Math.max(box.width, 4)}px`;
           marker.style.height = `${Math.max(box.height, 4)}px`;
-          marker.style.display = offscreen ? "none" : "";
           marker.title = `${pin.authorName}: ${pin.comment}`;
+          const badge = document.createElement("span");
+          badge.className = "rect-badge";
+          badge.textContent = num != null ? String(num) : "•";
+          marker.appendChild(badge);
           marker.addEventListener("click", (e) => {
             e.stopPropagation();
-            tipPinId = pin.id;
-            showTip(pin, box.left + box.width / 2, box.top);
+            focusPin(pin, true);
           });
           pinsLayer.appendChild(marker);
         }
@@ -488,7 +642,7 @@ type SessionInfo = {
 
       if (tipPinId) {
         const tipPin = pins.find((p) => p.id === tipPinId);
-        if (tipPin) {
+        if (tipPin && samePageClient(tipPin.pageUrl, window.location.href)) {
           const box = resolveViewportBox(tipPin.highlight);
           showTip(
             tipPin,
@@ -499,27 +653,150 @@ type SessionInfo = {
           );
         }
       } else if (focusedPinId) {
-        const focusPin = pins.find((p) => p.id === focusedPinId);
-        if (focusPin) {
-          const box = resolveViewportBox(focusPin.highlight);
-          const { docH } = docSize();
-          window.scrollTo({
-            top: Math.max(
-              0,
-              focusPin.highlight.y * docH - window.innerHeight / 2,
-            ),
-            behavior: "smooth",
-          });
-          tipPinId = focusPin.id;
-          showTip(
-            focusPin,
-            focusPin.highlight.type === "pin"
-              ? box.left
-              : box.left + box.width / 2,
-            box.top,
-          );
+        const focusTarget = pins.find((p) => p.id === focusedPinId);
+        if (focusTarget) {
+          focusPin(focusTarget, true);
           focusedPinId = null;
         }
+      }
+    }
+
+    function filteredNotes() {
+      const current = window.location.href.split("#")[0];
+      if (notesFilter === "mine") return pins.filter((p) => p.mine);
+      if (notesFilter === "all") return pins;
+      return pins.filter((p) => samePageClient(p.pageUrl, current));
+    }
+
+    function renderNotesPanel() {
+      const list = filteredNotes().sort((a, b) =>
+        String(b.createdAt || "").localeCompare(String(a.createdAt || "")),
+      );
+      if (list.length === 0) {
+        panelList.innerHTML =
+          '<div class="panel-empty">No notes here yet. Drop a comment pin or highlight to start.</div>';
+        return;
+      }
+
+      panelList.innerHTML = "";
+      for (const pin of list) {
+        const num = pinNumber(pin.id);
+        const card = document.createElement("div");
+        card.className = `note${selectedId === pin.id ? " active" : ""}`;
+        const onPage = samePageClient(
+          pin.pageUrl,
+          window.location.href.split("#")[0],
+        );
+        if (editingId === pin.id && pin.mine) {
+          card.innerHTML = `
+            <div class="meta">
+              <span>${num != null ? `<span class="num">${num}</span>` : ""}${escapeHtml(pin.authorName)}</span>
+              <span>${pin.highlight.type}</span>
+            </div>
+            <textarea data-edit-area>${escapeHtml(pin.comment)}</textarea>
+            <div class="note-actions">
+              <button type="button" class="save" data-save>Save</button>
+              <button type="button" class="edit" data-cancel-edit>Cancel</button>
+            </div>
+          `;
+          card.querySelector("[data-save]")!.addEventListener("click", async (e) => {
+            e.stopPropagation();
+            const next = (
+              card.querySelector("[data-edit-area]") as HTMLTextAreaElement
+            ).value.trim();
+            if (!next) return;
+            await saveNote(pin.id, next);
+          });
+          card
+            .querySelector("[data-cancel-edit]")!
+            .addEventListener("click", (e) => {
+              e.stopPropagation();
+              editingId = null;
+              renderNotesPanel();
+            });
+        } else {
+          card.innerHTML = `
+            <div class="meta">
+              <span>${num != null ? `<span class="num">${num}</span>` : ""}${escapeHtml(pin.authorName)}${pin.mine ? " · you" : ""}</span>
+              <span>${pin.highlight.type}</span>
+            </div>
+            <div class="body">${escapeHtml(pin.comment)}</div>
+            ${
+              onPage
+                ? ""
+                : `<div class="page">${escapeHtml(pin.pageTitle || pin.pageUrl)}</div>`
+            }
+            ${
+              pin.mine
+                ? `<div class="note-actions">
+                    <button type="button" class="edit" data-edit>Edit</button>
+                    <button type="button" class="del" data-del>Delete</button>
+                  </div>`
+                : ""
+            }
+          `;
+          card.addEventListener("click", () => {
+            if (onPage) focusPin(pin, true);
+            else window.open(pin.pageUrl, "_blank", "noopener,noreferrer");
+          });
+          card.querySelector("[data-edit]")?.addEventListener("click", (e) => {
+            e.stopPropagation();
+            editingId = pin.id;
+            renderNotesPanel();
+          });
+          card.querySelector("[data-del]")?.addEventListener("click", async (e) => {
+            e.stopPropagation();
+            if (!window.confirm("Delete this note?")) return;
+            await removeNote(pin.id);
+          });
+        }
+        panelList.appendChild(card);
+      }
+    }
+
+    async function saveNote(id: string, comment: string) {
+      try {
+        const res = await fetch(`${appOrigin}/api/embed/feedback/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ publicKey, token, comment }),
+        });
+        if (!res.ok) throw new Error("Failed");
+        const data = await res.json();
+        pins = pins.map((p) =>
+          p.id === id
+            ? {
+                ...p,
+                comment: data.pin.comment,
+                mine: true,
+              }
+            : p,
+        );
+        editingId = null;
+        renderPins();
+        renderNotesPanel();
+        toast("Note updated");
+      } catch {
+        toast("Could not save note");
+      }
+    }
+
+    async function removeNote(id: string) {
+      try {
+        const res = await fetch(`${appOrigin}/api/embed/feedback/${id}`, {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ publicKey, token }),
+        });
+        if (!res.ok) throw new Error("Failed");
+        pins = pins.filter((p) => p.id !== id);
+        if (selectedId === id) selectedId = null;
+        if (tipPinId === id) tipPinId = null;
+        renderPins();
+        renderNotesPanel();
+        toast("Note deleted");
+      } catch {
+        toast("Could not delete note");
       }
     }
 
@@ -529,7 +806,8 @@ type SessionInfo = {
       tipEl.className = "pin-tip";
       tipEl.style.left = `${Math.min(Math.max(80, x), window.innerWidth - 80)}px`;
       tipEl.style.top = `${Math.max(40, y)}px`;
-      tipEl.innerHTML = `<strong>${escapeHtml(pin.authorName)}</strong>${escapeHtml(pin.comment)}`;
+      const num = pinNumber(pin.id);
+      tipEl.innerHTML = `<strong>${num != null ? `#${num} · ` : ""}${escapeHtml(pin.authorName)}</strong>${escapeHtml(pin.comment)}`;
       pinsLayer.appendChild(tipEl);
       window.setTimeout(() => {
         if (tipPinId === pin.id) {
@@ -539,6 +817,23 @@ type SessionInfo = {
         }
       }, 5000);
     }
+
+    panel.querySelector("[data-close-panel]")!.addEventListener("click", () => {
+      setPanelOpen(false);
+    });
+    panel.querySelectorAll("[data-filter]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        notesFilter = btn.getAttribute("data-filter") as
+          | "page"
+          | "all"
+          | "mine";
+        panel
+          .querySelectorAll("[data-filter]")
+          .forEach((el) => el.classList.remove("active"));
+        btn.classList.add("active");
+        renderNotesPanel();
+      });
+    });
 
     function escapeHtml(value: string) {
       return value
@@ -603,8 +898,17 @@ type SessionInfo = {
           if (!res.ok) throw new Error("Failed");
           const data = await res.json();
           if (data.pin) {
-            pins = [data.pin, ...pins.filter((p) => p.id !== data.pin.id)];
-            renderPins(data.pin.id);
+            const nextPin: PinRecord = {
+              ...data.pin,
+              onThisPage: true,
+              mine: true,
+            };
+            pins = [nextPin, ...pins.filter((p) => p.id !== nextPin.id)];
+            selectedId = nextPin.id;
+            renderPins();
+            renderNotesPanel();
+            setPanelOpen(true);
+            focusPin(nextPin, true);
           }
           composer.remove();
           toast("Feedback sent — pin stays on the page");
@@ -679,6 +983,9 @@ type SessionInfo = {
       if (!btn) return;
       const nextMode = btn.getAttribute("data-mode") as "pin" | "rect" | null;
       if (nextMode) startMode(nextMode);
+      if (btn.getAttribute("data-action") === "notes") {
+        setPanelOpen(!panelOpen);
+      }
       if (btn.getAttribute("data-action") === "tour") startTour(true);
       if (btn.getAttribute("data-action") === "exit") {
         localStorage.removeItem(STORAGE_KEY);
@@ -694,7 +1001,7 @@ type SessionInfo = {
       },
       {
         title: "Drop a comment pin",
-        body: "Click Comment, then tap anything on the page. Add a short note and send — your pin stays visible afterward.",
+        body: "Click Comment, then tap anything on the page. Add a short note and send — numbered pins stay on the page.",
         target: '[data-mode="pin"]',
       },
       {
@@ -703,9 +1010,9 @@ type SessionInfo = {
         target: '[data-mode="rect"]',
       },
       {
-        title: "Pins stick around",
-        body: "Existing feedback from everyone on this page shows as markers. Click a marker to read it. Open ? anytime to replay this tour.",
-        target: '[data-action="tour"]',
+        title: "Notes sidebar",
+        body: "Open Notes anytime to see everyone’s feedback, jump to a pin, and edit or delete your own.",
+        target: '[data-action="notes"]',
       },
     ];
 
@@ -798,6 +1105,7 @@ type SessionInfo = {
     window.addEventListener("scroll", onScrollOrResize, { passive: true });
     window.addEventListener("resize", onScrollOrResize);
     renderPins(focusPinIdFromHash());
+    renderNotesPanel();
     void mode;
 
     // First visit on this device/browser → gentle coachmarks.

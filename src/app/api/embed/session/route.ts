@@ -79,9 +79,18 @@ export async function GET(req: Request) {
     limit: 200,
   });
 
-  const pagePins = pageUrl
-    ? allPins.filter((pin) => samePage(pin.pageUrl, pageUrl))
-    : allPins;
+  const mapped = allPins.map((pin) => ({
+    id: pin.id,
+    authorName: pin.authorName,
+    comment: pin.comment,
+    pageUrl: pin.pageUrl,
+    pageTitle: pin.pageTitle,
+    highlight: pin.highlight,
+    screenshotUrl: pin.screenshotUrl,
+    createdAt: pin.createdAt,
+    mine: pin.sessionId === session.id,
+    onThisPage: pageUrl ? samePage(pin.pageUrl, pageUrl) : true,
+  }));
 
   return NextResponse.json(
     {
@@ -93,16 +102,8 @@ export async function GET(req: Request) {
         siteUrl: project.siteUrl,
       },
       branding: brandingFromWorkspace(workspace),
-      pins: pagePins.map((pin) => ({
-        id: pin.id,
-        authorName: pin.authorName,
-        comment: pin.comment,
-        pageUrl: pin.pageUrl,
-        highlight: pin.highlight,
-        screenshotUrl: pin.screenshotUrl,
-        createdAt: pin.createdAt,
-        mine: pin.sessionId === session.id,
-      })),
+      // All project notes for the sidebar; markers use onThisPage.
+      pins: mapped,
     },
     { headers },
   );
