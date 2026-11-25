@@ -123,43 +123,41 @@ type SessionInfo = {
     return { docW, docH };
   }
 
-  /** Map stored highlight → current viewport pixels (scroll-aware). */
+  function isPinlaneNode(el: Element | null): boolean {
+    if (!el) return false;
+    if (el.id === "pinlane-root") return true;
+    try {
+      return Boolean(el.closest?.("#pinlane-root"));
+    } catch {
+      return false;
+    }
+  }
+
+  /** Page element under a point, ignoring the Pinlane overlay/widget. */
+  function pageTargetFromPoint(clientX: number, clientY: number): Element | null {
+    const host = document.getElementById("pinlane-root");
+    const prev = host?.style.pointerEvents;
+    if (host) host.style.pointerEvents = "none";
+    const target = document.elementFromPoint(clientX, clientY);
+    if (host) host.style.pointerEvents = prev || "";
+    if (!target || isPinlaneNode(target)) return null;
+    if (target === document.body || target === document.documentElement) {
+      return null;
+    }
+    return target;
+  }
+
+  /**
+   * Map stored highlight → current viewport pixels (scroll-aware).
+   * Always use document-normalized coords for placement so markers stay
+   * visible even when the captured selector was the widget/overlay.
+   */
   function resolveViewportBox(h: PinHighlight): {
     left: number;
     top: number;
     width: number;
     height: number;
   } {
-    if (h.selector) {
-      try {
-        const el = document.querySelector(h.selector);
-        if (el) {
-          const r = el.getBoundingClientRect();
-          if (h.type === "pin") {
-            const ox = h.ox ?? 0.5;
-            const oy = h.oy ?? 0.5;
-            return {
-              left: r.left + ox * r.width,
-              top: r.top + oy * r.height,
-              width: 0,
-              height: 0,
-            };
-          }
-          // Rect: prefer document ratios, but if ox/oy present treat x/y as element-relative
-          if (h.ox != null && h.oy != null && h.w != null && h.h != null) {
-            return {
-              left: r.left + h.ox * r.width,
-              top: r.top + h.oy * r.height,
-              width: h.w * r.width,
-              height: h.h * r.height,
-            };
-          }
-        }
-      } catch {
-        /* fall through */
-      }
-    }
-
     const { docW, docH } = docSize();
     return {
       left: h.x * docW - window.scrollX,
@@ -177,10 +175,15 @@ type SessionInfo = {
     const { docW, docH } = docSize();
     const pageX = clientX + window.scrollX;
     const pageY = clientY + window.scrollY;
+    const safeTarget = target && !isPinlaneNode(target) ? target : null;
     let ox: number | undefined;
     let oy: number | undefined;
-    if (target && target !== document.body && target !== document.documentElement) {
-      const r = target.getBoundingClientRect();
+    if (
+      safeTarget &&
+      safeTarget !== document.body &&
+      safeTarget !== document.documentElement
+    ) {
+      const r = safeTarget.getBoundingClientRect();
       if (r.width > 0 && r.height > 0) {
         ox = (clientX - r.left) / r.width;
         oy = (clientY - r.top) / r.height;
@@ -190,7 +193,7 @@ type SessionInfo = {
       type: "pin",
       x: pageX / docW,
       y: pageY / docH,
-      selector: cssPath(target),
+      selector: cssPath(safeTarget),
       ox,
       oy,
     };
@@ -206,13 +209,14 @@ type SessionInfo = {
     const { docW, docH } = docSize();
     const pageX = clientX + window.scrollX;
     const pageY = clientY + window.scrollY;
+    const safeTarget = target && !isPinlaneNode(target) ? target : null;
     return {
       type: "rect",
       x: pageX / docW,
       y: pageY / docH,
       w: clientW / docW,
       h: clientH / docH,
-      selector: cssPath(target),
+      selector: cssPath(safeTarget),
     };
   }
 
@@ -280,13 +284,21 @@ type SessionInfo = {
 
     const host = document.createElement("div");
     host.id = "pinlane-root";
+    host.style.pointerEvents = "none";
     document.documentElement.appendChild(host);
     const shadow = host.attachShadow({ mode: "open" });
 
     const style = document.createElement("style");
     style.textContent = `
-      :host { all: initial; }
+      :host {
+        all: initial;
+        pointer-events: none !important;
+      }
       * { box-sizing: border-box; font-family: "DM Sans", system-ui, sans-serif; }
+      .toolbar, .panel, .overlay, .composer, .toast, .tour-backdrop, .tour-card,
+      .pin-marker, .rect-marker, .powered, .panel * {
+        pointer-events: auto;
+      }
       .toolbar {
         position: fixed; right: 20px; bottom: 20px; z-index: 2147483646;
         display: flex; gap: 8px; align-items: center;
@@ -306,7 +318,7 @@ type SessionInfo = {
         position: fixed; inset: 0; z-index: 2147483645; cursor: crosshair;
       }
       .pins-layer {
-        position: fixed; inset: 0; z-index: 2147483644; pointer-events: none;
+        position: fixed; inset: 0; z-index: 2147483647; pointer-events: none;
       }
       .pin-marker {
         position: absolute; min-width: 24px; height: 24px; padding: 0 6px;
@@ -531,8 +543,9 @@ type SessionInfo = {
     }
 
     function pagePins() {
-      return pins.filter((p) =>
-        samePageClient(p.pageUrl, window.location.href.split("#")[0]),
+      const current = window.location.href.split("#")[0];
+      return pins.filter(
+        (p) => p.onThisPage === true || samePageClient(p.pageUrl, current),
       );
     }
 
@@ -578,19 +591,29 @@ type SessionInfo = {
     function focusPin(pin: PinRecord, openPanel = false) {
       selectedId = pin.id;
       tipPinId = pin.id;
-      const { docH } = docSize();
-      window.scrollTo({
-        top: Math.max(0, pin.highlight.y * docH - window.innerHeight / 2),
-        behavior: "smooth",
-      });
+      const box = resolveViewportBox(pin.highlight);
+      const offscreen =
+        box.top < 40 ||
+        box.top > window.innerHeight - 40 ||
+        box.left < 0 ||
+        box.left > window.innerWidth;
+      if (offscreen) {
+        const { docH } = docSize();
+        window.scrollTo({
+          top: Math.max(0, pin.highlight.y * docH - window.innerHeight / 2),
+          behavior: "smooth",
+        });
+      }
       renderPins();
       renderNotesPanel();
       if (openPanel) setPanelOpen(true);
-      const box = resolveViewportBox(pin.highlight);
+      const boxAfter = resolveViewportBox(pin.highlight);
       showTip(
         pin,
-        pin.highlight.type === "pin" ? box.left : box.left + box.width / 2,
-        box.top,
+        pin.highlight.type === "pin"
+          ? boxAfter.left
+          : boxAfter.left + boxAfter.width / 2,
+        boxAfter.top,
       );
     }
 
@@ -900,17 +923,31 @@ type SessionInfo = {
           if (data.pin) {
             const nextPin: PinRecord = {
               ...data.pin,
+              pageUrl:
+                data.pin.pageUrl || window.location.href.split("#")[0],
               onThisPage: true,
               mine: true,
             };
             pins = [nextPin, ...pins.filter((p) => p.id !== nextPin.id)];
             selectedId = nextPin.id;
+            tipPinId = nextPin.id;
+            composer.remove();
+            clearOverlay();
             renderPins();
             renderNotesPanel();
             setPanelOpen(true);
-            focusPin(nextPin, true);
+            const box = resolveViewportBox(nextPin.highlight);
+            showTip(
+              nextPin,
+              nextPin.highlight.type === "pin"
+                ? box.left
+                : box.left + box.width / 2,
+              box.top,
+            );
+          } else {
+            composer.remove();
+            clearOverlay();
           }
-          composer.remove();
           toast("Feedback sent — pin stays on the page");
         } catch {
           sendBtn.disabled = false;
@@ -931,11 +968,12 @@ type SessionInfo = {
 
       if (next === "pin") {
         overlay.addEventListener("click", (e) => {
-          const target = document.elementFromPoint(e.clientX, e.clientY);
+          const target = pageTargetFromPoint(e.clientX, e.clientY);
           const marker = document.createElement("div");
           marker.className = "pin-marker";
           marker.style.left = `${e.clientX}px`;
           marker.style.top = `${e.clientY}px`;
+          marker.textContent = "+";
           overlay!.appendChild(marker);
           const highlight = capturePinHighlight(e.clientX, e.clientY, target);
           openComposer(highlight, e.clientX, e.clientY);
@@ -970,7 +1008,7 @@ type SessionInfo = {
           }
           const cx = x + w / 2;
           const cy = y + h / 2;
-          const target = document.elementFromPoint(cx, cy);
+          const target = pageTargetFromPoint(cx, cy);
           const highlight = captureRectHighlight(x, y, w, h, target);
           openComposer(highlight, e.clientX, e.clientY);
           dragStart = null;
