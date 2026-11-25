@@ -32,6 +32,8 @@ App: [http://127.0.0.1:3456](http://127.0.0.1:3456)
 4. Copy the embed snippet onto that site  
 5. Create review links (optional reviewer name per link; as many as you need)  
 6. Work feedback on the board — open a pin on the live page or view its screenshot  
+
+Pin screenshots are captured in the browser (page viewport + drawn pin/highlight) and stored as JPEG data URLs in Postgres (`feedback_items.screenshot_url`). There is no separate object/CDN store yet.
 7. (Optional) Create an API key under **Branding & API keys** for MCP  
 
 Clients never need accounts (magic review links). Named links skip the name form; unnamed links ask once per session. Pins stay visible in the widget after send, with a short first-visit tour (? to replay). Extra agency seats are not open-signup; they stay owner-gated for self-host.

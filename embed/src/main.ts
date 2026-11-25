@@ -230,46 +230,98 @@ type SessionInfo = {
     return res.json();
   }
 
-  async function captureScreenshot(highlight: PinHighlight): Promise<string | undefined> {
+  async function captureScreenshot(
+    highlight: PinHighlight,
+    accent = "#E85D4C",
+  ): Promise<string | undefined> {
     try {
+      const host = document.getElementById("pinlane-root");
+      // Hide widget chrome so the shot is the real page, then stamp the pin on.
+      if (host) host.style.visibility = "hidden";
+      const scale = Math.min(1, 1200 / Math.max(window.innerWidth, 1));
       const canvas = await html2canvas(document.body, {
         useCORS: true,
         allowTaint: true,
         logging: false,
-        scale: Math.min(1, 1200 / Math.max(window.innerWidth, 1)),
+        scale,
         width: window.innerWidth,
         height: window.innerHeight,
         x: window.scrollX,
         y: window.scrollY,
-        windowWidth: window.innerWidth,
+        windowWidth: document.documentElement.clientWidth,
         windowHeight: window.innerHeight,
+        ignoreElements: (el) =>
+          el.id === "pinlane-root" ||
+          (el as HTMLElement).dataset?.pinlane === "ui",
       });
+      if (host) host.style.visibility = "";
+
       const ctx = canvas.getContext("2d");
       if (ctx) {
-        const box = resolveViewportBox(highlight);
-        const scaleX = canvas.width / Math.max(window.innerWidth, 1);
-        const scaleY = canvas.height / Math.max(window.innerHeight, 1);
+        // highlight x/y are document-normalized; convert to viewport CSS px, then canvas px
+        const { docW, docH } = docSize();
+        const viewLeft = highlight.x * docW - window.scrollX;
+        const viewTop = highlight.y * docH - window.scrollY;
+        const viewW = (highlight.w || 0) * docW;
+        const viewH = (highlight.h || 0) * docH;
+        const sx = canvas.width / Math.max(window.innerWidth, 1);
+        const sy = canvas.height / Math.max(window.innerHeight, 1);
+        const x = viewLeft * sx;
+        const y = viewTop * sy;
+        const w = viewW * sx;
+        const h = viewH * sy;
+
         ctx.save();
-        ctx.strokeStyle = "#E85D4C";
-        ctx.lineWidth = 3;
         if (highlight.type === "pin") {
+          const r = 16 * Math.max(sx, sy);
+          // Drop shadow
           ctx.beginPath();
-          ctx.arc(box.left * scaleX, box.top * scaleY, 14, 0, Math.PI * 2);
+          ctx.arc(x, y + 2 * sy, r, 0, Math.PI * 2);
+          ctx.fillStyle = "rgba(0,0,0,0.28)";
+          ctx.fill();
+          // Filled pin badge
+          ctx.beginPath();
+          ctx.arc(x, y, r, 0, Math.PI * 2);
+          ctx.fillStyle = accent;
+          ctx.fill();
+          ctx.lineWidth = 3 * Math.max(sx, sy);
+          ctx.strokeStyle = "#ffffff";
           ctx.stroke();
+          // Crosshair to mark exact point
+          ctx.beginPath();
+          ctx.arc(x, y, 3 * Math.max(sx, sy), 0, Math.PI * 2);
+          ctx.fillStyle = "#ffffff";
+          ctx.fill();
         } else {
-          ctx.strokeRect(
-            box.left * scaleX,
-            box.top * scaleY,
-            box.width * scaleX,
-            box.height * scaleY,
-          );
+          ctx.fillStyle = accent + "44";
+          ctx.strokeStyle = accent;
+          ctx.lineWidth = 3 * Math.max(sx, sy);
+          ctx.fillRect(x, y, Math.max(w, 4), Math.max(h, 4));
+          ctx.strokeRect(x, y, Math.max(w, 4), Math.max(h, 4));
+          // Corner badge
+          const br = 12 * Math.max(sx, sy);
+          ctx.beginPath();
+          ctx.arc(x, y, br, 0, Math.PI * 2);
+          ctx.fillStyle = accent;
+          ctx.fill();
+          ctx.lineWidth = 2 * Math.max(sx, sy);
+          ctx.strokeStyle = "#ffffff";
+          ctx.stroke();
         }
         ctx.restore();
       }
-      const dataUrl = canvas.toDataURL("image/jpeg", 0.55);
-      if (dataUrl.length > 1_400_000) return undefined;
+
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.62);
+      if (dataUrl.length > 1_400_000) {
+        // Retry more compressed if oversized for Postgres text
+        const smaller = canvas.toDataURL("image/jpeg", 0.4);
+        if (smaller.length > 1_400_000) return undefined;
+        return smaller;
+      }
       return dataUrl;
     } catch {
+      const host = document.getElementById("pinlane-root");
+      if (host) host.style.visibility = "";
       return undefined;
     }
   }
@@ -903,7 +955,7 @@ type SessionInfo = {
         try {
           composer.style.opacity = "0";
           clearOverlay();
-          const screenshotUrl = await captureScreenshot(highlight);
+          const screenshotUrl = await captureScreenshot(highlight, color);
           composer.style.opacity = "1";
           const res = await fetch(`${appOrigin}/api/embed/feedback`, {
             method: "POST",
