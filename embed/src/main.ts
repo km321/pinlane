@@ -417,6 +417,9 @@ type SessionInfo = {
       .pins-layer {
         position: fixed; inset: 0; z-index: 2147483644; pointer-events: none;
       }
+      /* In Browse mode, large highlights must not block links underneath. */
+      .pins-layer.browsing .rect-marker { pointer-events: none; }
+      .pins-layer.browsing .rect-marker .rect-badge { pointer-events: auto; }
       .pin-marker {
         position: absolute; min-width: 24px; height: 24px; padding: 0 6px;
         border-radius: 999px; display: flex; align-items: center; justify-content: center;
@@ -581,6 +584,7 @@ type SessionInfo = {
     toolbar.innerHTML = `
       <div class="brand-wrap">${logoHtml}<span class="brand">${brandName}</span></div>
       <span class="guest">${info.guestName || "Reviewer"}</span>
+      <button class="btn active" data-action="browse" type="button" title="Click links and move around the site">Browse</button>
       <button class="btn" data-mode="pin" type="button">Comment</button>
       <button class="btn" data-mode="rect" type="button">Highlight</button>
       <button class="btn" data-action="notes" type="button">Notes</button>
@@ -665,7 +669,14 @@ type SessionInfo = {
       setTimeout(() => el.remove(), 2200);
     }
 
-    function clearOverlay() {
+    function setBrowseActive(on: boolean) {
+      toolbar
+        .querySelector('[data-action="browse"]')
+        ?.classList.toggle("active", on);
+      pinsLayer.classList.toggle("browsing", on);
+    }
+
+    function enterBrowseMode() {
       overlay?.remove();
       overlay = null;
       dragStart = null;
@@ -674,6 +685,13 @@ type SessionInfo = {
       toolbar
         .querySelectorAll(".btn[data-mode]")
         .forEach((b) => b.classList.remove("active"));
+      setBrowseActive(true);
+      // Remove leftover draft composers so the page is fully clickable
+      shadow.querySelectorAll(".composer").forEach((el) => el.remove());
+    }
+
+    function clearOverlay() {
+      enterBrowseMode();
     }
 
     function setPanelOpen(open: boolean) {
@@ -1059,8 +1077,16 @@ type SessionInfo = {
     }
 
     function startMode(next: "pin" | "rect") {
-      clearOverlay();
+      overlay?.remove();
+      overlay = null;
+      dragStart = null;
+      draftRect = null;
+      shadow.querySelectorAll(".composer").forEach((el) => el.remove());
       mode = next;
+      setBrowseActive(false);
+      toolbar
+        .querySelectorAll(".btn[data-mode]")
+        .forEach((b) => b.classList.remove("active"));
       toolbar.querySelector(`[data-mode="${next}"]`)?.classList.add("active");
       overlay = document.createElement("div");
       overlay.className = "overlay";
@@ -1119,6 +1145,11 @@ type SessionInfo = {
     toolbar.addEventListener("click", (e) => {
       const btn = (e.target as HTMLElement).closest("button");
       if (!btn) return;
+      if (btn.getAttribute("data-action") === "browse") {
+        enterBrowseMode();
+        toast("Browsing — click links freely, toolbar stays with you");
+        return;
+      }
       const nextMode = btn.getAttribute("data-mode") as "pin" | "rect" | null;
       if (nextMode) startMode(nextMode);
       if (btn.getAttribute("data-action") === "notes") {
@@ -1136,6 +1167,11 @@ type SessionInfo = {
         title: `Welcome, ${info.guestName || "reviewer"}`,
         body: `This toolbar is your review kit for ${brandName}. Leave comments on the live page — the team sees who wrote each pin.`,
         target: null as string | null,
+      },
+      {
+        title: "Browse the site",
+        body: "Use Browse when you want to click links and move between pages. The toolbar stays up; Comment and Highlight turn off until you need them.",
+        target: '[data-action="browse"]',
       },
       {
         title: "Drop a comment pin",
@@ -1244,7 +1280,7 @@ type SessionInfo = {
     window.addEventListener("resize", onScrollOrResize);
     renderPins(focusPinIdFromHash());
     renderNotesPanel();
-    void mode;
+    setBrowseActive(true);
 
     // First visit on this device/browser → gentle coachmarks.
     window.setTimeout(() => startTour(false), 450);
