@@ -248,14 +248,26 @@
         100% { box-shadow: 0 0 0 0 ${o}00; }
       }
 
-      @media (max-width: 720px) {
+      @media (max-width: 900px), (pointer: coarse) {
         .toolbar {
-          left: 0; right: 0; bottom: 0;
+          left: 0 !important; right: 0 !important; bottom: 0 !important;
           width: 100%; max-width: none;
           flex-direction: column; align-items: stretch; gap: 10px;
           padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px));
+          padding-bottom: calc(10px + constant(safe-area-inset-bottom));
+          padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
           border-radius: 16px 16px 0 0;
           box-shadow: 0 -8px 32px rgba(11,31,42,.28);
+          /* Cover iOS / browser chrome gaps under the fixed dock */
+          background-clip: padding-box;
+        }
+        .toolbar::after {
+          content: "";
+          position: absolute;
+          left: 0; right: 0; top: 100%;
+          height: 64px;
+          background: ${c};
+          pointer-events: none;
         }
         .toolbar-meta {
           justify-content: space-between;
@@ -278,15 +290,28 @@
         .guest { display: none; }
         .brand { max-width: 140px; }
         .launcher {
-          left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom, 0px));
-          justify-content: center; width: auto;
-          min-height: 48px; border-radius: 14px;
+          left: 0 !important; right: 0 !important; bottom: 0 !important;
+          justify-content: center; width: 100%;
+          min-height: 48px;
+          border-radius: 16px 16px 0 0;
+          padding: 12px 14px calc(12px + env(safe-area-inset-bottom, 0px));
+          padding-bottom: calc(12px + constant(safe-area-inset-bottom));
+          padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+        }
+        .launcher::after {
+          content: "";
+          position: absolute;
+          left: 0; right: 0; top: 100%;
+          height: 64px;
+          background: ${c};
+          pointer-events: none;
         }
         .panel {
           width: 100vw; top: auto; height: min(78vh, 640px);
           border-radius: 16px 16px 0 0;
           transform: translateY(105%);
           padding-bottom: env(safe-area-inset-bottom, 0px);
+          bottom: 0 !important;
         }
         .panel.open { transform: translateY(0); }
         .panel-header { padding: 14px 16px; padding-top: max(14px, env(safe-area-inset-top, 0px)); }
@@ -302,9 +327,12 @@
           left: 50% !important; transform: translate(-50%, calc(-100% - 10px));
         }
         .toast {
-          bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+          bottom: calc(108px + env(safe-area-inset-bottom, 0px));
         }
         .powered { display: none; }
+        .composer.mobile-sheet {
+          padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+        }
         .tour-card {
           left: 12px !important; right: 12px !important; width: auto !important;
           bottom: calc(12px + env(safe-area-inset-bottom, 0px)); top: auto !important;
@@ -377,14 +405,14 @@
         <div class="tip-status"><span class="status ${he(e.status)}">${me(e.status)}</span></div>
         ${R(e.comment)}
         ${i?`<div class="tip-reply"><strong>${R(i.authorName)}:</strong> ${R(i.body)}</div>`:``}
-      `,C.appendChild(P),window.setTimeout(()=>{F===e.id&&(F=null,P?.remove(),P=null)},5e3)}k.querySelector(`[data-close-panel]`).addEventListener(`click`,()=>{_e(!1)}),k.querySelectorAll(`[data-filter]`).forEach(e=>{e.addEventListener(`click`,()=>{re=e.getAttribute(`data-filter`),k.querySelectorAll(`[data-filter]`).forEach(e=>e.classList.remove(`active`)),e.classList.add(`active`),I()})});function R(e){return e.replace(/&/g,`&amp;`).replace(/</g,`&lt;`).replace(/>/g,`&gt;`).replace(/"/g,`&quot;`)}function we(n,i,a){let s=document.createElement(`div`),c=window.innerWidth<=720;if(s.className=c?`composer mobile-sheet`:`composer`,!c){let e=Math.min(Math.max(12,i),window.innerWidth-360),t=Math.min(Math.max(12,a+16),window.innerHeight-220);s.style.left=`${e}px`,s.style.top=`${t}px`}s.innerHTML=`
+      `,C.appendChild(P),window.setTimeout(()=>{F===e.id&&(F=null,P?.remove(),P=null)},5e3)}k.querySelector(`[data-close-panel]`).addEventListener(`click`,()=>{_e(!1)}),k.querySelectorAll(`[data-filter]`).forEach(e=>{e.addEventListener(`click`,()=>{re=e.getAttribute(`data-filter`),k.querySelectorAll(`[data-filter]`).forEach(e=>e.classList.remove(`active`)),e.classList.add(`active`),I()})});function R(e){return e.replace(/&/g,`&amp;`).replace(/</g,`&lt;`).replace(/>/g,`&gt;`).replace(/"/g,`&quot;`)}function we(n,i,a){let s=document.createElement(`div`),c=window.innerWidth<=900||window.matchMedia(`(pointer: coarse)`).matches;if(s.className=c?`composer mobile-sheet`:`composer`,!c){let e=Math.min(Math.max(12,i),window.innerWidth-360),t=Math.min(Math.max(12,a+16),window.innerHeight-220);s.style.left=`${e}px`,s.style.top=`${t}px`}s.innerHTML=`
         <h3>Leave feedback</h3>
         <textarea placeholder="What should change?" enterkeyhint="send"></textarea>
         <div class="row">
           <button class="cancel" type="button">Cancel</button>
           <button class="send" type="button">Send</button>
         </div>
-      `,x.appendChild(s);let l=s.querySelector(`textarea`);l.focus(),s.querySelector(`.cancel`).addEventListener(`click`,()=>{s.remove(),pe()}),s.querySelector(`.send`).addEventListener(`click`,async()=>{let i=l.value.trim();if(!i)return;let a=s.querySelector(`.send`);a.disabled=!0,a.textContent=`Sending…`;try{s.style.opacity=`0`,pe();let a=await v(n,o);s.style.opacity=`1`;let c=await fetch(`${r}/api/embed/feedback`,{method:`POST`,headers:{"Content-Type":`application/json`},body:JSON.stringify({publicKey:t,token:e,pageUrl:window.location.href.split(`#`)[0],pageTitle:document.title,comment:i,highlight:n,screenshotUrl:a})});if(!c.ok)throw Error(`Failed`);let l=await c.json();if(l.pin){let e={...l.pin,pageUrl:l.pin.pageUrl||window.location.href.split(`#`)[0],onThisPage:!0,mine:!0};N=[e,...N.filter(t=>t.id!==e.id)],oe=e.id,F=e.id,s.remove(),pe(),be(),I(),_e(!0);let t=p(e.highlight);L(e,e.highlight.type===`pin`?t.left:t.left+t.width/2,t.top)}else s.remove(),pe();ue(`Feedback sent — pin stays on the page`)}catch{a.disabled=!1,a.textContent=`Send`,s.style.opacity=`1`,ue(`Could not send — try again`)}})}function Te(e){A?.remove(),A=null,j=null,M=null,x.querySelectorAll(`.composer`).forEach(e=>e.remove()),de(!1),w.querySelectorAll(`.btn[data-mode]`).forEach(e=>e.classList.remove(`active`)),w.querySelector(`[data-mode="${e}"]`)?.classList.add(`active`),A=document.createElement(`div`),A.className=`overlay`,x.appendChild(A),e===`pin`?A.addEventListener(`click`,e=>{let t=f(e.clientX,e.clientY),n=document.createElement(`div`);n.className=`pin-marker`,n.style.left=`${e.clientX}px`,n.style.top=`${e.clientY}px`,n.textContent=`+`,A.appendChild(n),we(m(e.clientX,e.clientY,t),e.clientX,e.clientY)}):(A.addEventListener(`mousedown`,e=>{j={x:e.clientX,y:e.clientY},M=document.createElement(`div`),M.className=`rect`,A.appendChild(M)}),A.addEventListener(`mousemove`,e=>{if(!j||!M)return;let t=Math.min(j.x,e.clientX),n=Math.min(j.y,e.clientY),r=Math.abs(e.clientX-j.x),i=Math.abs(e.clientY-j.y);M.style.left=`${t}px`,M.style.top=`${n}px`,M.style.width=`${r}px`,M.style.height=`${i}px`}),A.addEventListener(`mouseup`,e=>{if(!j)return;let t=Math.min(j.x,e.clientX),n=Math.min(j.y,e.clientY),r=Math.abs(e.clientX-j.x),i=Math.abs(e.clientY-j.y);r<8||i<8?pe():(we(h(t,n,r,i,f(t+r/2,n+i/2)),e.clientX,e.clientY),j=null)}))}w.addEventListener(`click`,e=>{let t=e.target.closest(`button`);if(!t)return;if(t.getAttribute(`data-action`)===`browse`){fe(),ue(`Browsing — click links freely, toolbar stays with you`);return}if(t.getAttribute(`data-action`)===`collapse`){te(!0),ue(`Toolbar hidden — tap the chip to bring it back`);return}let n=t.getAttribute(`data-mode`);n&&(O&&te(!1),Te(n)),t.getAttribute(`data-action`)===`notes`&&(O&&te(!1),_e(!ie)),t.getAttribute(`data-action`)===`tour`&&Ae(!0),t.getAttribute(`data-action`)===`exit`&&(localStorage.removeItem(i),b.remove())}),T.addEventListener(`click`,()=>{te(!1)});let Ee=[{title:`Welcome, ${n.guestName||`reviewer`}`,body:`This toolbar is your review kit for ${_}. Leave comments on the live page — the team sees who wrote each pin.`,target:null},{title:`Browse the site`,body:`Use Browse when you want to click links and move between pages. The toolbar stays up; Comment and Highlight turn off until you need them.`,target:`[data-action="browse"]`},{title:`Hide the toolbar`,body:`Tap ▾ to collapse the toolbar into a small chip while you browse. Tap the chip anytime to bring the full review tools back.`,target:`[data-action="collapse"]`},{title:`Drop a comment pin`,body:`Click Comment, then tap anything on the page. Add a short note and send — numbered pins stay on the page.`,target:`[data-mode="pin"]`},{title:`Highlight a region`,body:`Use Highlight to drag a box around a section that needs work. Great for layout and spacing notes.`,target:`[data-mode="rect"]`},{title:`Notes, replies & status`,body:`Open Notes to see every pin, the stage it’s in (Open / In progress / Done), and replies from the team. Fresh updates load when you open the panel.`,target:`[data-action="notes"]`}],De=[];function Oe(e){De.forEach(e=>e.remove()),De=[],w.querySelectorAll(`.tour-pulse`).forEach(e=>{e.classList.remove(`tour-pulse`)}),e&&localStorage.setItem(a,`1`)}function ke(e,t){if(window.innerWidth<=720){t&&(w.querySelectorAll(`.tour-pulse`).forEach(e=>{e.classList.remove(`tour-pulse`)}),w.querySelector(t)?.classList.add(`tour-pulse`)),e.style.left=`12px`,e.style.right=`12px`,e.style.width=`auto`,e.style.top=`auto`,e.style.bottom=`calc(12px + env(safe-area-inset-bottom, 0px))`;return}if(!t){e.style.left=`${Math.max(16,window.innerWidth/2-160)}px`,e.style.top=`${Math.max(16,window.innerHeight/2-90)}px`;return}let n=w.querySelector(t);w.querySelectorAll(`.tour-pulse`).forEach(e=>{e.classList.remove(`tour-pulse`)}),n?.classList.add(`tour-pulse`);let r=(n||w).getBoundingClientRect(),i=Math.min(320,window.innerWidth-32),a=Math.min(Math.max(16,r.left+r.width/2-i/2),window.innerWidth-i-16),o=r.top-12-170;o<16&&(o=r.bottom+12),e.style.left=`${a}px`,e.style.top=`${o}px`,e.style.width=`${i}px`}function Ae(e=!1){if(!e&&localStorage.getItem(a))return;Oe(!1);let t=0,n=document.createElement(`div`);n.className=`tour-backdrop`,n.addEventListener(`click`,()=>Oe(!0)),x.appendChild(n);let r=document.createElement(`div`);r.className=`tour-card`,x.appendChild(r),De=[n,r];function i(){let e=Ee[t];r.innerHTML=`
+      `,x.appendChild(s);let l=s.querySelector(`textarea`);l.focus(),s.querySelector(`.cancel`).addEventListener(`click`,()=>{s.remove(),pe()}),s.querySelector(`.send`).addEventListener(`click`,async()=>{let i=l.value.trim();if(!i)return;let a=s.querySelector(`.send`);a.disabled=!0,a.textContent=`Sending…`;try{s.style.opacity=`0`,pe();let a=await v(n,o);s.style.opacity=`1`;let c=await fetch(`${r}/api/embed/feedback`,{method:`POST`,headers:{"Content-Type":`application/json`},body:JSON.stringify({publicKey:t,token:e,pageUrl:window.location.href.split(`#`)[0],pageTitle:document.title,comment:i,highlight:n,screenshotUrl:a})});if(!c.ok)throw Error(`Failed`);let l=await c.json();if(l.pin){let e={...l.pin,pageUrl:l.pin.pageUrl||window.location.href.split(`#`)[0],onThisPage:!0,mine:!0};N=[e,...N.filter(t=>t.id!==e.id)],oe=e.id,F=e.id,s.remove(),pe(),be(),I(),_e(!0);let t=p(e.highlight);L(e,e.highlight.type===`pin`?t.left:t.left+t.width/2,t.top)}else s.remove(),pe();ue(`Feedback sent — pin stays on the page`)}catch{a.disabled=!1,a.textContent=`Send`,s.style.opacity=`1`,ue(`Could not send — try again`)}})}function Te(e){A?.remove(),A=null,j=null,M=null,x.querySelectorAll(`.composer`).forEach(e=>e.remove()),de(!1),w.querySelectorAll(`.btn[data-mode]`).forEach(e=>e.classList.remove(`active`)),w.querySelector(`[data-mode="${e}"]`)?.classList.add(`active`),A=document.createElement(`div`),A.className=`overlay`,x.appendChild(A),e===`pin`?A.addEventListener(`click`,e=>{let t=f(e.clientX,e.clientY),n=document.createElement(`div`);n.className=`pin-marker`,n.style.left=`${e.clientX}px`,n.style.top=`${e.clientY}px`,n.textContent=`+`,A.appendChild(n),we(m(e.clientX,e.clientY,t),e.clientX,e.clientY)}):(A.addEventListener(`mousedown`,e=>{j={x:e.clientX,y:e.clientY},M=document.createElement(`div`),M.className=`rect`,A.appendChild(M)}),A.addEventListener(`mousemove`,e=>{if(!j||!M)return;let t=Math.min(j.x,e.clientX),n=Math.min(j.y,e.clientY),r=Math.abs(e.clientX-j.x),i=Math.abs(e.clientY-j.y);M.style.left=`${t}px`,M.style.top=`${n}px`,M.style.width=`${r}px`,M.style.height=`${i}px`}),A.addEventListener(`mouseup`,e=>{if(!j)return;let t=Math.min(j.x,e.clientX),n=Math.min(j.y,e.clientY),r=Math.abs(e.clientX-j.x),i=Math.abs(e.clientY-j.y);r<8||i<8?pe():(we(h(t,n,r,i,f(t+r/2,n+i/2)),e.clientX,e.clientY),j=null)}))}w.addEventListener(`click`,e=>{let t=e.target.closest(`button`);if(!t)return;if(t.getAttribute(`data-action`)===`browse`){fe(),ue(`Browsing — click links freely, toolbar stays with you`);return}if(t.getAttribute(`data-action`)===`collapse`){te(!0),ue(`Toolbar hidden — tap the chip to bring it back`);return}let n=t.getAttribute(`data-mode`);n&&(O&&te(!1),Te(n)),t.getAttribute(`data-action`)===`notes`&&(O&&te(!1),_e(!ie)),t.getAttribute(`data-action`)===`tour`&&Ae(!0),t.getAttribute(`data-action`)===`exit`&&(localStorage.removeItem(i),b.remove())}),T.addEventListener(`click`,()=>{te(!1)});let Ee=[{title:`Welcome, ${n.guestName||`reviewer`}`,body:`This toolbar is your review kit for ${_}. Leave comments on the live page — the team sees who wrote each pin.`,target:null},{title:`Browse the site`,body:`Use Browse when you want to click links and move between pages. The toolbar stays up; Comment and Highlight turn off until you need them.`,target:`[data-action="browse"]`},{title:`Hide the toolbar`,body:`Tap ▾ to collapse the toolbar into a small chip while you browse. Tap the chip anytime to bring the full review tools back.`,target:`[data-action="collapse"]`},{title:`Drop a comment pin`,body:`Click Comment, then tap anything on the page. Add a short note and send — numbered pins stay on the page.`,target:`[data-mode="pin"]`},{title:`Highlight a region`,body:`Use Highlight to drag a box around a section that needs work. Great for layout and spacing notes.`,target:`[data-mode="rect"]`},{title:`Notes, replies & status`,body:`Open Notes to see every pin, the stage it’s in (Open / In progress / Done), and replies from the team. Fresh updates load when you open the panel.`,target:`[data-action="notes"]`}],De=[];function Oe(e){De.forEach(e=>e.remove()),De=[],w.querySelectorAll(`.tour-pulse`).forEach(e=>{e.classList.remove(`tour-pulse`)}),e&&localStorage.setItem(a,`1`)}function ke(e,t){if(window.innerWidth<=900||window.matchMedia(`(pointer: coarse)`).matches){t&&(w.querySelectorAll(`.tour-pulse`).forEach(e=>{e.classList.remove(`tour-pulse`)}),w.querySelector(t)?.classList.add(`tour-pulse`)),e.style.left=`12px`,e.style.right=`12px`,e.style.width=`auto`,e.style.top=`auto`,e.style.bottom=`calc(12px + env(safe-area-inset-bottom, 0px))`;return}if(!t){e.style.left=`${Math.max(16,window.innerWidth/2-160)}px`,e.style.top=`${Math.max(16,window.innerHeight/2-90)}px`;return}let n=w.querySelector(t);w.querySelectorAll(`.tour-pulse`).forEach(e=>{e.classList.remove(`tour-pulse`)}),n?.classList.add(`tour-pulse`);let r=(n||w).getBoundingClientRect(),i=Math.min(320,window.innerWidth-32),a=Math.min(Math.max(16,r.left+r.width/2-i/2),window.innerWidth-i-16),o=r.top-12-170;o<16&&(o=r.bottom+12),e.style.left=`${a}px`,e.style.top=`${o}px`,e.style.width=`${i}px`}function Ae(e=!1){if(!e&&localStorage.getItem(a))return;Oe(!1);let t=0,n=document.createElement(`div`);n.className=`tour-backdrop`,n.addEventListener(`click`,()=>Oe(!0)),x.appendChild(n);let r=document.createElement(`div`);r.className=`tour-card`,x.appendChild(r),De=[n,r];function i(){let e=Ee[t];r.innerHTML=`
           <h3>${R(e.title)}</h3>
           <p>${R(e.body)}</p>
           <div class="steps">${t+1} of ${Ee.length}</div>

@@ -643,14 +643,26 @@ type SessionInfo = {
         100% { box-shadow: 0 0 0 0 ${color}00; }
       }
 
-      @media (max-width: 720px) {
+      @media (max-width: 900px), (pointer: coarse) {
         .toolbar {
-          left: 0; right: 0; bottom: 0;
+          left: 0 !important; right: 0 !important; bottom: 0 !important;
           width: 100%; max-width: none;
           flex-direction: column; align-items: stretch; gap: 10px;
           padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px));
+          padding-bottom: calc(10px + constant(safe-area-inset-bottom));
+          padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
           border-radius: 16px 16px 0 0;
           box-shadow: 0 -8px 32px rgba(11,31,42,.28);
+          /* Cover iOS / browser chrome gaps under the fixed dock */
+          background-clip: padding-box;
+        }
+        .toolbar::after {
+          content: "";
+          position: absolute;
+          left: 0; right: 0; top: 100%;
+          height: 64px;
+          background: ${sidebar};
+          pointer-events: none;
         }
         .toolbar-meta {
           justify-content: space-between;
@@ -673,15 +685,28 @@ type SessionInfo = {
         .guest { display: none; }
         .brand { max-width: 140px; }
         .launcher {
-          left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom, 0px));
-          justify-content: center; width: auto;
-          min-height: 48px; border-radius: 14px;
+          left: 0 !important; right: 0 !important; bottom: 0 !important;
+          justify-content: center; width: 100%;
+          min-height: 48px;
+          border-radius: 16px 16px 0 0;
+          padding: 12px 14px calc(12px + env(safe-area-inset-bottom, 0px));
+          padding-bottom: calc(12px + constant(safe-area-inset-bottom));
+          padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+        }
+        .launcher::after {
+          content: "";
+          position: absolute;
+          left: 0; right: 0; top: 100%;
+          height: 64px;
+          background: ${sidebar};
+          pointer-events: none;
         }
         .panel {
           width: 100vw; top: auto; height: min(78vh, 640px);
           border-radius: 16px 16px 0 0;
           transform: translateY(105%);
           padding-bottom: env(safe-area-inset-bottom, 0px);
+          bottom: 0 !important;
         }
         .panel.open { transform: translateY(0); }
         .panel-header { padding: 14px 16px; padding-top: max(14px, env(safe-area-inset-top, 0px)); }
@@ -697,9 +722,12 @@ type SessionInfo = {
           left: 50% !important; transform: translate(-50%, calc(-100% - 10px));
         }
         .toast {
-          bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+          bottom: calc(108px + env(safe-area-inset-bottom, 0px));
         }
         .powered { display: none; }
+        .composer.mobile-sheet {
+          padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+        }
         .tour-card {
           left: 12px !important; right: 12px !important; width: auto !important;
           bottom: calc(12px + env(safe-area-inset-bottom, 0px)); top: auto !important;
@@ -1233,7 +1261,9 @@ type SessionInfo = {
       clientY: number,
     ) {
       const composer = document.createElement("div");
-      const mobile = window.innerWidth <= 720;
+      const mobile =
+        window.innerWidth <= 900 ||
+        window.matchMedia("(pointer: coarse)").matches;
       composer.className = mobile ? "composer mobile-sheet" : "composer";
       if (!mobile) {
         const left = Math.min(Math.max(12, clientX), window.innerWidth - 360);
@@ -1470,7 +1500,9 @@ type SessionInfo = {
 
     function placeTourCard(card: HTMLElement, targetSel: string | null) {
       const margin = 16;
-      const mobile = window.innerWidth <= 720;
+      const mobile =
+        window.innerWidth <= 900 ||
+        window.matchMedia("(pointer: coarse)").matches;
       if (mobile) {
         if (targetSel) {
           toolbar.querySelectorAll(".tour-pulse").forEach((el) => {
