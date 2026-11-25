@@ -413,8 +413,15 @@ type SessionInfo = {
         background: ${sidebar}; color: #fff; padding: 10px 12px;
         border-radius: calc(${radius} * 2); box-shadow: 0 12px 40px rgba(11,31,42,.35);
         transition: opacity .18s ease, transform .18s ease;
+        max-width: calc(100vw - 24px);
       }
       .toolbar.collapsed { display: none; }
+      .toolbar-meta {
+        display: flex; align-items: center; gap: 8px; min-width: 0;
+      }
+      .toolbar-actions {
+        display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+      }
       .launcher {
         position: fixed; right: 20px; bottom: 20px; z-index: 2147483646;
         display: none; align-items: center; gap: 8px;
@@ -422,22 +429,28 @@ type SessionInfo = {
         padding: 10px 14px; border-radius: calc(${radius} * 2);
         box-shadow: 0 12px 40px rgba(11,31,42,.35);
         font: inherit; font-size: 13px; font-weight: 700;
+        min-height: 44px;
       }
       .launcher.visible { display: inline-flex; }
       .launcher .chev { font-size: 14px; line-height: 1; opacity: .9; }
       .launcher:hover { filter: brightness(1.08); }
       /* Keep chrome above live pins/highlights so markers never cover the sidebar. */
-      .brand-wrap { display: flex; align-items: center; gap: 8px; margin-right: 4px; }
+      .brand-wrap { display: flex; align-items: center; gap: 8px; margin-right: 4px; min-width: 0; }
       .brand-logo { height: 18px; width: auto; max-width: 72px; object-fit: contain; }
-      .brand { font-weight: 700; font-size: 13px; letter-spacing: .02em; }
-      .guest { font-size: 11px; opacity: .7; margin-right: 4px; }
+      .brand {
+        font-weight: 700; font-size: 13px; letter-spacing: .02em;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 120px;
+      }
+      .guest { font-size: 11px; opacity: .7; margin-right: 4px; white-space: nowrap; }
       .btn {
         border: 0; border-radius: calc(${radius} * 2); padding: 8px 12px; cursor: pointer;
         background: rgba(255,255,255,.12); color: #fff; font-size: 13px; font-weight: 600;
+        min-height: 36px; touch-action: manipulation;
       }
       .btn.icon {
-        padding: 8px 10px; min-width: 34px; line-height: 1;
+        padding: 8px 10px; min-width: 36px; line-height: 1;
       }
+      .btn .short { display: none; }
       .btn.active, .btn.primary { background: ${color}; color: #fff; }
       .overlay {
         position: fixed; inset: 0; z-index: 2147483645; cursor: crosshair;
@@ -570,21 +583,28 @@ type SessionInfo = {
         background: ${surface}; color: #0b1f2a; border-radius: ${radius}; padding: 14px;
         box-shadow: 0 18px 50px rgba(11,31,42,.28);
       }
+      .composer.mobile-sheet {
+        left: 0 !important; right: 0 !important; bottom: 0 !important; top: auto !important;
+        width: 100%; max-width: none; border-radius: 16px 16px 0 0;
+        padding: 16px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+      }
       .composer h3 { margin: 0 0 8px; font-size: 15px; }
       .composer textarea {
         width: 100%; min-height: 90px; resize: vertical; border: 1px solid #d7dee5;
         border-radius: calc(${radius} * 0.8); padding: 10px; font: inherit;
+        font-size: 16px; /* avoid iOS zoom on focus */
       }
       .composer .row { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
       .composer button {
-        border: 0; border-radius: calc(${radius} * 2); padding: 8px 14px; font-weight: 600; cursor: pointer;
+        border: 0; border-radius: calc(${radius} * 2); padding: 10px 14px; font-weight: 600; cursor: pointer;
+        min-height: 44px; touch-action: manipulation;
       }
       .composer .cancel { background: #eef2f5; }
-      .composer .send { background: ${color}; color: #fff; }
+      .composer .send { background: ${color}; color: #fff; flex: 1; }
       .toast {
         position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
         background: ${sidebar}; color: #fff; padding: 10px 16px; border-radius: calc(${radius} * 2);
-        z-index: 2147483647; font-size: 13px;
+        z-index: 2147483647; font-size: 13px; max-width: calc(100vw - 24px);
       }
       .powered {
         position: fixed; left: 16px; bottom: 16px; z-index: 2147483646;
@@ -622,6 +642,70 @@ type SessionInfo = {
         70% { box-shadow: 0 0 0 12px ${color}00; }
         100% { box-shadow: 0 0 0 0 ${color}00; }
       }
+
+      @media (max-width: 720px) {
+        .toolbar {
+          left: 0; right: 0; bottom: 0;
+          width: 100%; max-width: none;
+          flex-direction: column; align-items: stretch; gap: 10px;
+          padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px));
+          border-radius: 16px 16px 0 0;
+          box-shadow: 0 -8px 32px rgba(11,31,42,.28);
+        }
+        .toolbar-meta {
+          justify-content: space-between;
+        }
+        .toolbar-actions {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 6px;
+          width: 100%;
+        }
+        .toolbar-actions .btn {
+          width: 100%;
+          min-height: 44px;
+          padding: 10px 6px;
+          font-size: 12px;
+          display: inline-flex; align-items: center; justify-content: center;
+        }
+        .toolbar-actions .btn .full { display: none; }
+        .toolbar-actions .btn .short { display: inline; }
+        .guest { display: none; }
+        .brand { max-width: 140px; }
+        .launcher {
+          left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+          justify-content: center; width: auto;
+          min-height: 48px; border-radius: 14px;
+        }
+        .panel {
+          width: 100vw; top: auto; height: min(78vh, 640px);
+          border-radius: 16px 16px 0 0;
+          transform: translateY(105%);
+          padding-bottom: env(safe-area-inset-bottom, 0px);
+        }
+        .panel.open { transform: translateY(0); }
+        .panel-header { padding: 14px 16px; padding-top: max(14px, env(safe-area-inset-top, 0px)); }
+        .panel-header button { min-height: 40px; padding: 8px 12px; }
+        .panel-filters {
+          overflow-x: auto; -webkit-overflow-scrolling: touch;
+          scrollbar-width: none;
+        }
+        .panel-filters::-webkit-scrollbar { display: none; }
+        .panel-filters button { min-height: 36px; flex: 0 0 auto; }
+        .pin-tip {
+          max-width: min(260px, calc(100vw - 24px));
+          left: 50% !important; transform: translate(-50%, calc(-100% - 10px));
+        }
+        .toast {
+          bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+        }
+        .powered { display: none; }
+        .tour-card {
+          left: 12px !important; right: 12px !important; width: auto !important;
+          bottom: calc(12px + env(safe-area-inset-bottom, 0px)); top: auto !important;
+        }
+        .tour-card button { min-height: 44px; }
+      }
     `;
     shadow.appendChild(style);
 
@@ -635,15 +719,29 @@ type SessionInfo = {
       ? `<img class="brand-logo" src="${info.branding.logoUrl}" alt="" />`
       : "";
     toolbar.innerHTML = `
-      <div class="brand-wrap">${logoHtml}<span class="brand">${brandName}</span></div>
-      <span class="guest">${info.guestName || "Reviewer"}</span>
-      <button class="btn active" data-action="browse" type="button" title="Click links and move around the site">Browse</button>
-      <button class="btn" data-mode="pin" type="button">Comment</button>
-      <button class="btn" data-mode="rect" type="button">Highlight</button>
-      <button class="btn" data-action="notes" type="button">Notes</button>
-      <button class="btn" data-action="tour" type="button" title="Quick tour">?</button>
-      <button class="btn icon" data-action="collapse" type="button" title="Hide toolbar while browsing">▾</button>
-      <button class="btn" data-action="exit" type="button">Exit</button>
+      <div class="toolbar-meta">
+        <div class="brand-wrap">${logoHtml}<span class="brand">${brandName}</span></div>
+        <span class="guest">${info.guestName || "Reviewer"}</span>
+        <button class="btn icon" data-action="collapse" type="button" title="Hide toolbar while browsing" aria-label="Hide toolbar">▾</button>
+      </div>
+      <div class="toolbar-actions">
+        <button class="btn active" data-action="browse" type="button" title="Click links and move around the site">
+          <span class="full">Browse</span><span class="short">Browse</span>
+        </button>
+        <button class="btn" data-mode="pin" type="button" title="Drop a comment pin">
+          <span class="full">Comment</span><span class="short">Pin</span>
+        </button>
+        <button class="btn" data-mode="rect" type="button" title="Highlight a region">
+          <span class="full">Highlight</span><span class="short">Box</span>
+        </button>
+        <button class="btn" data-action="notes" type="button" title="Open notes">
+          <span class="full">Notes</span><span class="short">Notes</span>
+        </button>
+        <button class="btn btn-tour" data-action="tour" type="button" title="Quick tour">?</button>
+        <button class="btn btn-exit" data-action="exit" type="button" title="Exit review">
+          <span class="full">Exit</span><span class="short">Exit</span>
+        </button>
+      </div>
     `;
     shadow.appendChild(toolbar);
 
@@ -1135,14 +1233,20 @@ type SessionInfo = {
       clientY: number,
     ) {
       const composer = document.createElement("div");
-      composer.className = "composer";
-      const left = Math.min(Math.max(12, clientX), window.innerWidth - 360);
-      const top = Math.min(Math.max(12, clientY + 16), window.innerHeight - 220);
-      composer.style.left = `${left}px`;
-      composer.style.top = `${top}px`;
+      const mobile = window.innerWidth <= 720;
+      composer.className = mobile ? "composer mobile-sheet" : "composer";
+      if (!mobile) {
+        const left = Math.min(Math.max(12, clientX), window.innerWidth - 360);
+        const top = Math.min(
+          Math.max(12, clientY + 16),
+          window.innerHeight - 220,
+        );
+        composer.style.left = `${left}px`;
+        composer.style.top = `${top}px`;
+      }
       composer.innerHTML = `
         <h3>Leave feedback</h3>
-        <textarea placeholder="What should change?"></textarea>
+        <textarea placeholder="What should change?" enterkeyhint="send"></textarea>
         <div class="row">
           <button class="cancel" type="button">Cancel</button>
           <button class="send" type="button">Send</button>
@@ -1366,6 +1470,21 @@ type SessionInfo = {
 
     function placeTourCard(card: HTMLElement, targetSel: string | null) {
       const margin = 16;
+      const mobile = window.innerWidth <= 720;
+      if (mobile) {
+        if (targetSel) {
+          toolbar.querySelectorAll(".tour-pulse").forEach((el) => {
+            el.classList.remove("tour-pulse");
+          });
+          toolbar.querySelector(targetSel)?.classList.add("tour-pulse");
+        }
+        card.style.left = "12px";
+        card.style.right = "12px";
+        card.style.width = "auto";
+        card.style.top = "auto";
+        card.style.bottom = `calc(12px + env(safe-area-inset-bottom, 0px))`;
+        return;
+      }
       if (!targetSel) {
         card.style.left = `${Math.max(margin, window.innerWidth / 2 - 160)}px`;
         card.style.top = `${Math.max(margin, window.innerHeight / 2 - 90)}px`;

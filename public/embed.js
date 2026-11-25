@@ -18,8 +18,15 @@
         background: ${c}; color: #fff; padding: 10px 12px;
         border-radius: calc(${d} * 2); box-shadow: 0 12px 40px rgba(11,31,42,.35);
         transition: opacity .18s ease, transform .18s ease;
+        max-width: calc(100vw - 24px);
       }
       .toolbar.collapsed { display: none; }
+      .toolbar-meta {
+        display: flex; align-items: center; gap: 8px; min-width: 0;
+      }
+      .toolbar-actions {
+        display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+      }
       .launcher {
         position: fixed; right: 20px; bottom: 20px; z-index: 2147483646;
         display: none; align-items: center; gap: 8px;
@@ -27,22 +34,28 @@
         padding: 10px 14px; border-radius: calc(${d} * 2);
         box-shadow: 0 12px 40px rgba(11,31,42,.35);
         font: inherit; font-size: 13px; font-weight: 700;
+        min-height: 44px;
       }
       .launcher.visible { display: inline-flex; }
       .launcher .chev { font-size: 14px; line-height: 1; opacity: .9; }
       .launcher:hover { filter: brightness(1.08); }
       /* Keep chrome above live pins/highlights so markers never cover the sidebar. */
-      .brand-wrap { display: flex; align-items: center; gap: 8px; margin-right: 4px; }
+      .brand-wrap { display: flex; align-items: center; gap: 8px; margin-right: 4px; min-width: 0; }
       .brand-logo { height: 18px; width: auto; max-width: 72px; object-fit: contain; }
-      .brand { font-weight: 700; font-size: 13px; letter-spacing: .02em; }
-      .guest { font-size: 11px; opacity: .7; margin-right: 4px; }
+      .brand {
+        font-weight: 700; font-size: 13px; letter-spacing: .02em;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 120px;
+      }
+      .guest { font-size: 11px; opacity: .7; margin-right: 4px; white-space: nowrap; }
       .btn {
         border: 0; border-radius: calc(${d} * 2); padding: 8px 12px; cursor: pointer;
         background: rgba(255,255,255,.12); color: #fff; font-size: 13px; font-weight: 600;
+        min-height: 36px; touch-action: manipulation;
       }
       .btn.icon {
-        padding: 8px 10px; min-width: 34px; line-height: 1;
+        padding: 8px 10px; min-width: 36px; line-height: 1;
       }
+      .btn .short { display: none; }
       .btn.active, .btn.primary { background: ${o}; color: #fff; }
       .overlay {
         position: fixed; inset: 0; z-index: 2147483645; cursor: crosshair;
@@ -175,21 +188,28 @@
         background: ${l}; color: #0b1f2a; border-radius: ${d}; padding: 14px;
         box-shadow: 0 18px 50px rgba(11,31,42,.28);
       }
+      .composer.mobile-sheet {
+        left: 0 !important; right: 0 !important; bottom: 0 !important; top: auto !important;
+        width: 100%; max-width: none; border-radius: 16px 16px 0 0;
+        padding: 16px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+      }
       .composer h3 { margin: 0 0 8px; font-size: 15px; }
       .composer textarea {
         width: 100%; min-height: 90px; resize: vertical; border: 1px solid #d7dee5;
         border-radius: calc(${d} * 0.8); padding: 10px; font: inherit;
+        font-size: 16px; /* avoid iOS zoom on focus */
       }
       .composer .row { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
       .composer button {
-        border: 0; border-radius: calc(${d} * 2); padding: 8px 14px; font-weight: 600; cursor: pointer;
+        border: 0; border-radius: calc(${d} * 2); padding: 10px 14px; font-weight: 600; cursor: pointer;
+        min-height: 44px; touch-action: manipulation;
       }
       .composer .cancel { background: #eef2f5; }
-      .composer .send { background: ${o}; color: #fff; }
+      .composer .send { background: ${o}; color: #fff; flex: 1; }
       .toast {
         position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
         background: ${c}; color: #fff; padding: 10px 16px; border-radius: calc(${d} * 2);
-        z-index: 2147483647; font-size: 13px;
+        z-index: 2147483647; font-size: 13px; max-width: calc(100vw - 24px);
       }
       .powered {
         position: fixed; left: 16px; bottom: 16px; z-index: 2147483646;
@@ -227,16 +247,94 @@
         70% { box-shadow: 0 0 0 12px ${o}00; }
         100% { box-shadow: 0 0 0 0 ${o}00; }
       }
+
+      @media (max-width: 720px) {
+        .toolbar {
+          left: 0; right: 0; bottom: 0;
+          width: 100%; max-width: none;
+          flex-direction: column; align-items: stretch; gap: 10px;
+          padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px));
+          border-radius: 16px 16px 0 0;
+          box-shadow: 0 -8px 32px rgba(11,31,42,.28);
+        }
+        .toolbar-meta {
+          justify-content: space-between;
+        }
+        .toolbar-actions {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 6px;
+          width: 100%;
+        }
+        .toolbar-actions .btn {
+          width: 100%;
+          min-height: 44px;
+          padding: 10px 6px;
+          font-size: 12px;
+          display: inline-flex; align-items: center; justify-content: center;
+        }
+        .toolbar-actions .btn .full { display: none; }
+        .toolbar-actions .btn .short { display: inline; }
+        .guest { display: none; }
+        .brand { max-width: 140px; }
+        .launcher {
+          left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+          justify-content: center; width: auto;
+          min-height: 48px; border-radius: 14px;
+        }
+        .panel {
+          width: 100vw; top: auto; height: min(78vh, 640px);
+          border-radius: 16px 16px 0 0;
+          transform: translateY(105%);
+          padding-bottom: env(safe-area-inset-bottom, 0px);
+        }
+        .panel.open { transform: translateY(0); }
+        .panel-header { padding: 14px 16px; padding-top: max(14px, env(safe-area-inset-top, 0px)); }
+        .panel-header button { min-height: 40px; padding: 8px 12px; }
+        .panel-filters {
+          overflow-x: auto; -webkit-overflow-scrolling: touch;
+          scrollbar-width: none;
+        }
+        .panel-filters::-webkit-scrollbar { display: none; }
+        .panel-filters button { min-height: 36px; flex: 0 0 auto; }
+        .pin-tip {
+          max-width: min(260px, calc(100vw - 24px));
+          left: 50% !important; transform: translate(-50%, calc(-100% - 10px));
+        }
+        .toast {
+          bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+        }
+        .powered { display: none; }
+        .tour-card {
+          left: 12px !important; right: 12px !important; width: auto !important;
+          bottom: calc(12px + env(safe-area-inset-bottom, 0px)); top: auto !important;
+        }
+        .tour-card button { min-height: 44px; }
+      }
     `,x.appendChild(S);let C=document.createElement(`div`);C.className=`pins-layer`,x.appendChild(C);let w=document.createElement(`div`);w.className=`toolbar`,w.innerHTML=`
-      <div class="brand-wrap">${n.branding?.logoUrl?`<img class="brand-logo" src="${n.branding.logoUrl}" alt="" />`:``}<span class="brand">${_}</span></div>
-      <span class="guest">${n.guestName||`Reviewer`}</span>
-      <button class="btn active" data-action="browse" type="button" title="Click links and move around the site">Browse</button>
-      <button class="btn" data-mode="pin" type="button">Comment</button>
-      <button class="btn" data-mode="rect" type="button">Highlight</button>
-      <button class="btn" data-action="notes" type="button">Notes</button>
-      <button class="btn" data-action="tour" type="button" title="Quick tour">?</button>
-      <button class="btn icon" data-action="collapse" type="button" title="Hide toolbar while browsing">▾</button>
-      <button class="btn" data-action="exit" type="button">Exit</button>
+      <div class="toolbar-meta">
+        <div class="brand-wrap">${n.branding?.logoUrl?`<img class="brand-logo" src="${n.branding.logoUrl}" alt="" />`:``}<span class="brand">${_}</span></div>
+        <span class="guest">${n.guestName||`Reviewer`}</span>
+        <button class="btn icon" data-action="collapse" type="button" title="Hide toolbar while browsing" aria-label="Hide toolbar">▾</button>
+      </div>
+      <div class="toolbar-actions">
+        <button class="btn active" data-action="browse" type="button" title="Click links and move around the site">
+          <span class="full">Browse</span><span class="short">Browse</span>
+        </button>
+        <button class="btn" data-mode="pin" type="button" title="Drop a comment pin">
+          <span class="full">Comment</span><span class="short">Pin</span>
+        </button>
+        <button class="btn" data-mode="rect" type="button" title="Highlight a region">
+          <span class="full">Highlight</span><span class="short">Box</span>
+        </button>
+        <button class="btn" data-action="notes" type="button" title="Open notes">
+          <span class="full">Notes</span><span class="short">Notes</span>
+        </button>
+        <button class="btn btn-tour" data-action="tour" type="button" title="Quick tour">?</button>
+        <button class="btn btn-exit" data-action="exit" type="button" title="Exit review">
+          <span class="full">Exit</span><span class="short">Exit</span>
+        </button>
+      </div>
     `,x.appendChild(w);let T=document.createElement(`button`);T.type=`button`,T.className=`launcher`,T.title=`Show review toolbar`;let E=document.createElement(`span`);E.className=`chev`,E.textContent=`▴`;let D=document.createElement(`span`);D.textContent=_,T.append(E,D),x.appendChild(T);let O=!1,ee=`pinlane_toolbar_collapsed`;function te(e){O=e,w.classList.toggle(`collapsed`,e),T.classList.toggle(`visible`,e);try{sessionStorage.setItem(ee,e?`1`:`0`)}catch{}e&&(_e(!1),fe())}let k=document.createElement(`aside`);k.className=`panel`,k.innerHTML=`
       <div class="panel-header">
         <h2>Notes</h2>
@@ -279,14 +377,14 @@
         <div class="tip-status"><span class="status ${he(e.status)}">${me(e.status)}</span></div>
         ${R(e.comment)}
         ${i?`<div class="tip-reply"><strong>${R(i.authorName)}:</strong> ${R(i.body)}</div>`:``}
-      `,C.appendChild(P),window.setTimeout(()=>{F===e.id&&(F=null,P?.remove(),P=null)},5e3)}k.querySelector(`[data-close-panel]`).addEventListener(`click`,()=>{_e(!1)}),k.querySelectorAll(`[data-filter]`).forEach(e=>{e.addEventListener(`click`,()=>{re=e.getAttribute(`data-filter`),k.querySelectorAll(`[data-filter]`).forEach(e=>e.classList.remove(`active`)),e.classList.add(`active`),I()})});function R(e){return e.replace(/&/g,`&amp;`).replace(/</g,`&lt;`).replace(/>/g,`&gt;`).replace(/"/g,`&quot;`)}function we(n,i,a){let s=document.createElement(`div`);s.className=`composer`;let c=Math.min(Math.max(12,i),window.innerWidth-360),l=Math.min(Math.max(12,a+16),window.innerHeight-220);s.style.left=`${c}px`,s.style.top=`${l}px`,s.innerHTML=`
+      `,C.appendChild(P),window.setTimeout(()=>{F===e.id&&(F=null,P?.remove(),P=null)},5e3)}k.querySelector(`[data-close-panel]`).addEventListener(`click`,()=>{_e(!1)}),k.querySelectorAll(`[data-filter]`).forEach(e=>{e.addEventListener(`click`,()=>{re=e.getAttribute(`data-filter`),k.querySelectorAll(`[data-filter]`).forEach(e=>e.classList.remove(`active`)),e.classList.add(`active`),I()})});function R(e){return e.replace(/&/g,`&amp;`).replace(/</g,`&lt;`).replace(/>/g,`&gt;`).replace(/"/g,`&quot;`)}function we(n,i,a){let s=document.createElement(`div`),c=window.innerWidth<=720;if(s.className=c?`composer mobile-sheet`:`composer`,!c){let e=Math.min(Math.max(12,i),window.innerWidth-360),t=Math.min(Math.max(12,a+16),window.innerHeight-220);s.style.left=`${e}px`,s.style.top=`${t}px`}s.innerHTML=`
         <h3>Leave feedback</h3>
-        <textarea placeholder="What should change?"></textarea>
+        <textarea placeholder="What should change?" enterkeyhint="send"></textarea>
         <div class="row">
           <button class="cancel" type="button">Cancel</button>
           <button class="send" type="button">Send</button>
         </div>
-      `,x.appendChild(s);let u=s.querySelector(`textarea`);u.focus(),s.querySelector(`.cancel`).addEventListener(`click`,()=>{s.remove(),pe()}),s.querySelector(`.send`).addEventListener(`click`,async()=>{let i=u.value.trim();if(!i)return;let a=s.querySelector(`.send`);a.disabled=!0,a.textContent=`Sending…`;try{s.style.opacity=`0`,pe();let a=await v(n,o);s.style.opacity=`1`;let c=await fetch(`${r}/api/embed/feedback`,{method:`POST`,headers:{"Content-Type":`application/json`},body:JSON.stringify({publicKey:t,token:e,pageUrl:window.location.href.split(`#`)[0],pageTitle:document.title,comment:i,highlight:n,screenshotUrl:a})});if(!c.ok)throw Error(`Failed`);let l=await c.json();if(l.pin){let e={...l.pin,pageUrl:l.pin.pageUrl||window.location.href.split(`#`)[0],onThisPage:!0,mine:!0};N=[e,...N.filter(t=>t.id!==e.id)],oe=e.id,F=e.id,s.remove(),pe(),be(),I(),_e(!0);let t=p(e.highlight);L(e,e.highlight.type===`pin`?t.left:t.left+t.width/2,t.top)}else s.remove(),pe();ue(`Feedback sent — pin stays on the page`)}catch{a.disabled=!1,a.textContent=`Send`,s.style.opacity=`1`,ue(`Could not send — try again`)}})}function Te(e){A?.remove(),A=null,j=null,M=null,x.querySelectorAll(`.composer`).forEach(e=>e.remove()),de(!1),w.querySelectorAll(`.btn[data-mode]`).forEach(e=>e.classList.remove(`active`)),w.querySelector(`[data-mode="${e}"]`)?.classList.add(`active`),A=document.createElement(`div`),A.className=`overlay`,x.appendChild(A),e===`pin`?A.addEventListener(`click`,e=>{let t=f(e.clientX,e.clientY),n=document.createElement(`div`);n.className=`pin-marker`,n.style.left=`${e.clientX}px`,n.style.top=`${e.clientY}px`,n.textContent=`+`,A.appendChild(n),we(m(e.clientX,e.clientY,t),e.clientX,e.clientY)}):(A.addEventListener(`mousedown`,e=>{j={x:e.clientX,y:e.clientY},M=document.createElement(`div`),M.className=`rect`,A.appendChild(M)}),A.addEventListener(`mousemove`,e=>{if(!j||!M)return;let t=Math.min(j.x,e.clientX),n=Math.min(j.y,e.clientY),r=Math.abs(e.clientX-j.x),i=Math.abs(e.clientY-j.y);M.style.left=`${t}px`,M.style.top=`${n}px`,M.style.width=`${r}px`,M.style.height=`${i}px`}),A.addEventListener(`mouseup`,e=>{if(!j)return;let t=Math.min(j.x,e.clientX),n=Math.min(j.y,e.clientY),r=Math.abs(e.clientX-j.x),i=Math.abs(e.clientY-j.y);r<8||i<8?pe():(we(h(t,n,r,i,f(t+r/2,n+i/2)),e.clientX,e.clientY),j=null)}))}w.addEventListener(`click`,e=>{let t=e.target.closest(`button`);if(!t)return;if(t.getAttribute(`data-action`)===`browse`){fe(),ue(`Browsing — click links freely, toolbar stays with you`);return}if(t.getAttribute(`data-action`)===`collapse`){te(!0),ue(`Toolbar hidden — tap the chip to bring it back`);return}let n=t.getAttribute(`data-mode`);n&&(O&&te(!1),Te(n)),t.getAttribute(`data-action`)===`notes`&&(O&&te(!1),_e(!ie)),t.getAttribute(`data-action`)===`tour`&&Ae(!0),t.getAttribute(`data-action`)===`exit`&&(localStorage.removeItem(i),b.remove())}),T.addEventListener(`click`,()=>{te(!1)});let Ee=[{title:`Welcome, ${n.guestName||`reviewer`}`,body:`This toolbar is your review kit for ${_}. Leave comments on the live page — the team sees who wrote each pin.`,target:null},{title:`Browse the site`,body:`Use Browse when you want to click links and move between pages. The toolbar stays up; Comment and Highlight turn off until you need them.`,target:`[data-action="browse"]`},{title:`Hide the toolbar`,body:`Tap ▾ to collapse the toolbar into a small chip while you browse. Tap the chip anytime to bring the full review tools back.`,target:`[data-action="collapse"]`},{title:`Drop a comment pin`,body:`Click Comment, then tap anything on the page. Add a short note and send — numbered pins stay on the page.`,target:`[data-mode="pin"]`},{title:`Highlight a region`,body:`Use Highlight to drag a box around a section that needs work. Great for layout and spacing notes.`,target:`[data-mode="rect"]`},{title:`Notes, replies & status`,body:`Open Notes to see every pin, the stage it’s in (Open / In progress / Done), and replies from the team. Fresh updates load when you open the panel.`,target:`[data-action="notes"]`}],De=[];function Oe(e){De.forEach(e=>e.remove()),De=[],w.querySelectorAll(`.tour-pulse`).forEach(e=>{e.classList.remove(`tour-pulse`)}),e&&localStorage.setItem(a,`1`)}function ke(e,t){if(!t){e.style.left=`${Math.max(16,window.innerWidth/2-160)}px`,e.style.top=`${Math.max(16,window.innerHeight/2-90)}px`;return}let n=w.querySelector(t);w.querySelectorAll(`.tour-pulse`).forEach(e=>{e.classList.remove(`tour-pulse`)}),n?.classList.add(`tour-pulse`);let r=(n||w).getBoundingClientRect(),i=Math.min(320,window.innerWidth-32),a=Math.min(Math.max(16,r.left+r.width/2-i/2),window.innerWidth-i-16),o=r.top-12-170;o<16&&(o=r.bottom+12),e.style.left=`${a}px`,e.style.top=`${o}px`,e.style.width=`${i}px`}function Ae(e=!1){if(!e&&localStorage.getItem(a))return;Oe(!1);let t=0,n=document.createElement(`div`);n.className=`tour-backdrop`,n.addEventListener(`click`,()=>Oe(!0)),x.appendChild(n);let r=document.createElement(`div`);r.className=`tour-card`,x.appendChild(r),De=[n,r];function i(){let e=Ee[t];r.innerHTML=`
+      `,x.appendChild(s);let l=s.querySelector(`textarea`);l.focus(),s.querySelector(`.cancel`).addEventListener(`click`,()=>{s.remove(),pe()}),s.querySelector(`.send`).addEventListener(`click`,async()=>{let i=l.value.trim();if(!i)return;let a=s.querySelector(`.send`);a.disabled=!0,a.textContent=`Sending…`;try{s.style.opacity=`0`,pe();let a=await v(n,o);s.style.opacity=`1`;let c=await fetch(`${r}/api/embed/feedback`,{method:`POST`,headers:{"Content-Type":`application/json`},body:JSON.stringify({publicKey:t,token:e,pageUrl:window.location.href.split(`#`)[0],pageTitle:document.title,comment:i,highlight:n,screenshotUrl:a})});if(!c.ok)throw Error(`Failed`);let l=await c.json();if(l.pin){let e={...l.pin,pageUrl:l.pin.pageUrl||window.location.href.split(`#`)[0],onThisPage:!0,mine:!0};N=[e,...N.filter(t=>t.id!==e.id)],oe=e.id,F=e.id,s.remove(),pe(),be(),I(),_e(!0);let t=p(e.highlight);L(e,e.highlight.type===`pin`?t.left:t.left+t.width/2,t.top)}else s.remove(),pe();ue(`Feedback sent — pin stays on the page`)}catch{a.disabled=!1,a.textContent=`Send`,s.style.opacity=`1`,ue(`Could not send — try again`)}})}function Te(e){A?.remove(),A=null,j=null,M=null,x.querySelectorAll(`.composer`).forEach(e=>e.remove()),de(!1),w.querySelectorAll(`.btn[data-mode]`).forEach(e=>e.classList.remove(`active`)),w.querySelector(`[data-mode="${e}"]`)?.classList.add(`active`),A=document.createElement(`div`),A.className=`overlay`,x.appendChild(A),e===`pin`?A.addEventListener(`click`,e=>{let t=f(e.clientX,e.clientY),n=document.createElement(`div`);n.className=`pin-marker`,n.style.left=`${e.clientX}px`,n.style.top=`${e.clientY}px`,n.textContent=`+`,A.appendChild(n),we(m(e.clientX,e.clientY,t),e.clientX,e.clientY)}):(A.addEventListener(`mousedown`,e=>{j={x:e.clientX,y:e.clientY},M=document.createElement(`div`),M.className=`rect`,A.appendChild(M)}),A.addEventListener(`mousemove`,e=>{if(!j||!M)return;let t=Math.min(j.x,e.clientX),n=Math.min(j.y,e.clientY),r=Math.abs(e.clientX-j.x),i=Math.abs(e.clientY-j.y);M.style.left=`${t}px`,M.style.top=`${n}px`,M.style.width=`${r}px`,M.style.height=`${i}px`}),A.addEventListener(`mouseup`,e=>{if(!j)return;let t=Math.min(j.x,e.clientX),n=Math.min(j.y,e.clientY),r=Math.abs(e.clientX-j.x),i=Math.abs(e.clientY-j.y);r<8||i<8?pe():(we(h(t,n,r,i,f(t+r/2,n+i/2)),e.clientX,e.clientY),j=null)}))}w.addEventListener(`click`,e=>{let t=e.target.closest(`button`);if(!t)return;if(t.getAttribute(`data-action`)===`browse`){fe(),ue(`Browsing — click links freely, toolbar stays with you`);return}if(t.getAttribute(`data-action`)===`collapse`){te(!0),ue(`Toolbar hidden — tap the chip to bring it back`);return}let n=t.getAttribute(`data-mode`);n&&(O&&te(!1),Te(n)),t.getAttribute(`data-action`)===`notes`&&(O&&te(!1),_e(!ie)),t.getAttribute(`data-action`)===`tour`&&Ae(!0),t.getAttribute(`data-action`)===`exit`&&(localStorage.removeItem(i),b.remove())}),T.addEventListener(`click`,()=>{te(!1)});let Ee=[{title:`Welcome, ${n.guestName||`reviewer`}`,body:`This toolbar is your review kit for ${_}. Leave comments on the live page — the team sees who wrote each pin.`,target:null},{title:`Browse the site`,body:`Use Browse when you want to click links and move between pages. The toolbar stays up; Comment and Highlight turn off until you need them.`,target:`[data-action="browse"]`},{title:`Hide the toolbar`,body:`Tap ▾ to collapse the toolbar into a small chip while you browse. Tap the chip anytime to bring the full review tools back.`,target:`[data-action="collapse"]`},{title:`Drop a comment pin`,body:`Click Comment, then tap anything on the page. Add a short note and send — numbered pins stay on the page.`,target:`[data-mode="pin"]`},{title:`Highlight a region`,body:`Use Highlight to drag a box around a section that needs work. Great for layout and spacing notes.`,target:`[data-mode="rect"]`},{title:`Notes, replies & status`,body:`Open Notes to see every pin, the stage it’s in (Open / In progress / Done), and replies from the team. Fresh updates load when you open the panel.`,target:`[data-action="notes"]`}],De=[];function Oe(e){De.forEach(e=>e.remove()),De=[],w.querySelectorAll(`.tour-pulse`).forEach(e=>{e.classList.remove(`tour-pulse`)}),e&&localStorage.setItem(a,`1`)}function ke(e,t){if(window.innerWidth<=720){t&&(w.querySelectorAll(`.tour-pulse`).forEach(e=>{e.classList.remove(`tour-pulse`)}),w.querySelector(t)?.classList.add(`tour-pulse`)),e.style.left=`12px`,e.style.right=`12px`,e.style.width=`auto`,e.style.top=`auto`,e.style.bottom=`calc(12px + env(safe-area-inset-bottom, 0px))`;return}if(!t){e.style.left=`${Math.max(16,window.innerWidth/2-160)}px`,e.style.top=`${Math.max(16,window.innerHeight/2-90)}px`;return}let n=w.querySelector(t);w.querySelectorAll(`.tour-pulse`).forEach(e=>{e.classList.remove(`tour-pulse`)}),n?.classList.add(`tour-pulse`);let r=(n||w).getBoundingClientRect(),i=Math.min(320,window.innerWidth-32),a=Math.min(Math.max(16,r.left+r.width/2-i/2),window.innerWidth-i-16),o=r.top-12-170;o<16&&(o=r.bottom+12),e.style.left=`${a}px`,e.style.top=`${o}px`,e.style.width=`${i}px`}function Ae(e=!1){if(!e&&localStorage.getItem(a))return;Oe(!1);let t=0,n=document.createElement(`div`);n.className=`tour-backdrop`,n.addEventListener(`click`,()=>Oe(!0)),x.appendChild(n);let r=document.createElement(`div`);r.className=`tour-card`,x.appendChild(r),De=[n,r];function i(){let e=Ee[t];r.innerHTML=`
           <h3>${R(e.title)}</h3>
           <p>${R(e.body)}</p>
           <div class="steps">${t+1} of ${Ee.length}</div>
