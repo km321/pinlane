@@ -76,10 +76,15 @@ Pinlane does not store a GitHub PAT. Agents use their own GitHub tools against t
 
 ## Railway
 
+Production: [https://pinlane-production.up.railway.app](https://pinlane-production.up.railway.app)
+
 1. New project → add **Postgres**  
-2. Deploy this repo as a web service  
+2. Deploy this repo as a web service (Node **22**; `NIXPACKS_NODE_VERSION=22`)  
 3. Set `DATABASE_URL` (from Postgres), `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `NEXT_PUBLIC_APP_URL` to the public URL  
-4. Start command uses `npm run start:migrate` (see `railway.toml`)
+4. Start command: `npm run start:migrate` (runs Drizzle migrations, then Next on `$PORT`)  
+5. Point the public domain’s **target port** at the same `$PORT` the process listens on (default `8080` on Railway)
+
+First visit: create the owner account on `/signup`. Signup locks after that.
 
 ## Scripts
 
