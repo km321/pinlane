@@ -79,7 +79,7 @@ Pinlane does not store a GitHub PAT. Agents use their own GitHub tools against t
 
 ## Railway
 
-Production: [https://pinlane-production.up.railway.app](https://pinlane-production.up.railway.app)
+Production: [https://feedback.meltonstudios.com](https://feedback.meltonstudios.com)
 
 1. New project → add **Postgres** + a **Storage Bucket** (for pin screenshots)  
 2. Deploy this repo as a web service (Node **22**; `NIXPACKS_NODE_VERSION=22`)  
