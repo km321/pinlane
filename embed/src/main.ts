@@ -230,6 +230,65 @@ type SessionInfo = {
     return res.json();
   }
 
+  function stampHighlightOnCanvas(
+    canvas: HTMLCanvasElement,
+    highlight: PinHighlight,
+    accent: string,
+  ) {
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    // html2canvas leaves scale()+translate() on this context. Reset so we
+    // can paint in raw canvas pixels (otherwise markers land off-image).
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+    const box = resolveViewportBox(highlight);
+    const sx = canvas.width / Math.max(window.innerWidth, 1);
+    const sy = canvas.height / Math.max(window.innerHeight, 1);
+    const x = box.left * sx;
+    const y = box.top * sy;
+    const w = box.width * sx;
+    const h = box.height * sy;
+    const unit = Math.max(sx, sy);
+
+    if (highlight.type === "pin") {
+      const r = 16 * unit;
+      ctx.beginPath();
+      ctx.arc(x, y + 2 * unit, r, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(0,0,0,0.28)";
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fillStyle = accent;
+      ctx.fill();
+      ctx.lineWidth = 3 * unit;
+      ctx.strokeStyle = "#ffffff";
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(x, y, 3 * unit, 0, Math.PI * 2);
+      ctx.fillStyle = "#ffffff";
+      ctx.fill();
+    } else {
+      const rw = Math.max(w, 4 * unit);
+      const rh = Math.max(h, 4 * unit);
+      ctx.fillStyle = `${accent}55`;
+      ctx.strokeStyle = accent;
+      ctx.lineWidth = 3 * unit;
+      ctx.fillRect(x, y, rw, rh);
+      ctx.strokeRect(x, y, rw, rh);
+      const br = 12 * unit;
+      ctx.beginPath();
+      ctx.arc(x, y, br, 0, Math.PI * 2);
+      ctx.fillStyle = accent;
+      ctx.fill();
+      ctx.lineWidth = 2 * unit;
+      ctx.strokeStyle = "#ffffff";
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
   async function captureScreenshot(
     highlight: PinHighlight,
     accent = "#E85D4C",
@@ -240,16 +299,20 @@ type SessionInfo = {
       if (host) host.style.visibility = "hidden";
       // Cap long edge ~1280 CSS px so JPEG stays useful but compact
       const scale = Math.min(1, 1280 / Math.max(window.innerWidth, 1));
-      const canvas = await html2canvas(document.body, {
+      const scrollX = window.scrollX;
+      const scrollY = window.scrollY;
+      const canvas = await html2canvas(document.documentElement, {
         useCORS: true,
         allowTaint: true,
         logging: false,
         scale,
         width: window.innerWidth,
         height: window.innerHeight,
-        x: window.scrollX,
-        y: window.scrollY,
-        windowWidth: document.documentElement.clientWidth,
+        x: scrollX,
+        y: scrollY,
+        scrollX,
+        scrollY,
+        windowWidth: window.innerWidth,
         windowHeight: window.innerHeight,
         ignoreElements: (el) =>
           el.id === "pinlane-root" ||
@@ -257,60 +320,7 @@ type SessionInfo = {
       });
       if (host) host.style.visibility = "";
 
-      const ctx = canvas.getContext("2d");
-      if (ctx) {
-        // highlight x/y are document-normalized; convert to viewport CSS px, then canvas px
-        const { docW, docH } = docSize();
-        const viewLeft = highlight.x * docW - window.scrollX;
-        const viewTop = highlight.y * docH - window.scrollY;
-        const viewW = (highlight.w || 0) * docW;
-        const viewH = (highlight.h || 0) * docH;
-        const sx = canvas.width / Math.max(window.innerWidth, 1);
-        const sy = canvas.height / Math.max(window.innerHeight, 1);
-        const x = viewLeft * sx;
-        const y = viewTop * sy;
-        const w = viewW * sx;
-        const h = viewH * sy;
-
-        ctx.save();
-        if (highlight.type === "pin") {
-          const r = 16 * Math.max(sx, sy);
-          // Drop shadow
-          ctx.beginPath();
-          ctx.arc(x, y + 2 * sy, r, 0, Math.PI * 2);
-          ctx.fillStyle = "rgba(0,0,0,0.28)";
-          ctx.fill();
-          // Filled pin badge
-          ctx.beginPath();
-          ctx.arc(x, y, r, 0, Math.PI * 2);
-          ctx.fillStyle = accent;
-          ctx.fill();
-          ctx.lineWidth = 3 * Math.max(sx, sy);
-          ctx.strokeStyle = "#ffffff";
-          ctx.stroke();
-          // Crosshair to mark exact point
-          ctx.beginPath();
-          ctx.arc(x, y, 3 * Math.max(sx, sy), 0, Math.PI * 2);
-          ctx.fillStyle = "#ffffff";
-          ctx.fill();
-        } else {
-          ctx.fillStyle = accent + "44";
-          ctx.strokeStyle = accent;
-          ctx.lineWidth = 3 * Math.max(sx, sy);
-          ctx.fillRect(x, y, Math.max(w, 4), Math.max(h, 4));
-          ctx.strokeRect(x, y, Math.max(w, 4), Math.max(h, 4));
-          // Corner badge
-          const br = 12 * Math.max(sx, sy);
-          ctx.beginPath();
-          ctx.arc(x, y, br, 0, Math.PI * 2);
-          ctx.fillStyle = accent;
-          ctx.fill();
-          ctx.lineWidth = 2 * Math.max(sx, sy);
-          ctx.strokeStyle = "#ffffff";
-          ctx.stroke();
-        }
-        ctx.restore();
-      }
+      stampHighlightOnCanvas(canvas, highlight, accent);
 
       // Target ~220KB binary (readable for board work, small for upload).
       return await canvasToCompressedJpeg(canvas, 220_000);
