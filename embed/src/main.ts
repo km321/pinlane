@@ -403,7 +403,7 @@ type SessionInfo = {
         pointer-events: none !important;
       }
       * { box-sizing: border-box; font-family: "DM Sans", system-ui, sans-serif; }
-      .toolbar, .panel, .overlay, .composer, .toast, .tour-backdrop, .tour-card,
+      .toolbar, .launcher, .panel, .overlay, .composer, .toast, .tour-backdrop, .tour-card,
       .pin-marker, .rect-marker, .powered, .panel * {
         pointer-events: auto;
       }
@@ -412,7 +412,20 @@ type SessionInfo = {
         display: flex; gap: 8px; align-items: center;
         background: ${sidebar}; color: #fff; padding: 10px 12px;
         border-radius: calc(${radius} * 2); box-shadow: 0 12px 40px rgba(11,31,42,.35);
+        transition: opacity .18s ease, transform .18s ease;
       }
+      .toolbar.collapsed { display: none; }
+      .launcher {
+        position: fixed; right: 20px; bottom: 20px; z-index: 2147483646;
+        display: none; align-items: center; gap: 8px;
+        background: ${sidebar}; color: #fff; border: 0; cursor: pointer;
+        padding: 10px 14px; border-radius: calc(${radius} * 2);
+        box-shadow: 0 12px 40px rgba(11,31,42,.35);
+        font: inherit; font-size: 13px; font-weight: 700;
+      }
+      .launcher.visible { display: inline-flex; }
+      .launcher .chev { font-size: 14px; line-height: 1; opacity: .9; }
+      .launcher:hover { filter: brightness(1.08); }
       /* Keep chrome above live pins/highlights so markers never cover the sidebar. */
       .brand-wrap { display: flex; align-items: center; gap: 8px; margin-right: 4px; }
       .brand-logo { height: 18px; width: auto; max-width: 72px; object-fit: contain; }
@@ -421,6 +434,9 @@ type SessionInfo = {
       .btn {
         border: 0; border-radius: calc(${radius} * 2); padding: 8px 12px; cursor: pointer;
         background: rgba(255,255,255,.12); color: #fff; font-size: 13px; font-weight: 600;
+      }
+      .btn.icon {
+        padding: 8px 10px; min-width: 34px; line-height: 1;
       }
       .btn.active, .btn.primary { background: ${color}; color: #fff; }
       .overlay {
@@ -626,9 +642,40 @@ type SessionInfo = {
       <button class="btn" data-mode="rect" type="button">Highlight</button>
       <button class="btn" data-action="notes" type="button">Notes</button>
       <button class="btn" data-action="tour" type="button" title="Quick tour">?</button>
+      <button class="btn icon" data-action="collapse" type="button" title="Hide toolbar while browsing">▾</button>
       <button class="btn" data-action="exit" type="button">Exit</button>
     `;
     shadow.appendChild(toolbar);
+
+    const launcher = document.createElement("button");
+    launcher.type = "button";
+    launcher.className = "launcher";
+    launcher.title = "Show review toolbar";
+    const launcherChev = document.createElement("span");
+    launcherChev.className = "chev";
+    launcherChev.textContent = "▴";
+    const launcherLabel = document.createElement("span");
+    launcherLabel.textContent = brandName;
+    launcher.append(launcherChev, launcherLabel);
+    shadow.appendChild(launcher);
+
+    let toolbarCollapsed = false;
+    const COLLAPSE_KEY = "pinlane_toolbar_collapsed";
+
+    function setToolbarCollapsed(collapsed: boolean) {
+      toolbarCollapsed = collapsed;
+      toolbar.classList.toggle("collapsed", collapsed);
+      launcher.classList.toggle("visible", collapsed);
+      try {
+        sessionStorage.setItem(COLLAPSE_KEY, collapsed ? "1" : "0");
+      } catch {
+        /* ignore */
+      }
+      if (collapsed) {
+        setPanelOpen(false);
+        enterBrowseMode();
+      }
+    }
 
     const panel = document.createElement("aside");
     panel.className = "panel";
@@ -1248,9 +1295,18 @@ type SessionInfo = {
         toast("Browsing — click links freely, toolbar stays with you");
         return;
       }
+      if (btn.getAttribute("data-action") === "collapse") {
+        setToolbarCollapsed(true);
+        toast("Toolbar hidden — tap the chip to bring it back");
+        return;
+      }
       const nextMode = btn.getAttribute("data-mode") as "pin" | "rect" | null;
-      if (nextMode) startMode(nextMode);
+      if (nextMode) {
+        if (toolbarCollapsed) setToolbarCollapsed(false);
+        startMode(nextMode);
+      }
       if (btn.getAttribute("data-action") === "notes") {
+        if (toolbarCollapsed) setToolbarCollapsed(false);
         setPanelOpen(!panelOpen);
       }
       if (btn.getAttribute("data-action") === "tour") startTour(true);
@@ -1258,6 +1314,10 @@ type SessionInfo = {
         localStorage.removeItem(STORAGE_KEY);
         host.remove();
       }
+    });
+
+    launcher.addEventListener("click", () => {
+      setToolbarCollapsed(false);
     });
 
     const tourSteps = [
@@ -1270,6 +1330,11 @@ type SessionInfo = {
         title: "Browse the site",
         body: "Use Browse when you want to click links and move between pages. The toolbar stays up; Comment and Highlight turn off until you need them.",
         target: '[data-action="browse"]',
+      },
+      {
+        title: "Hide the toolbar",
+        body: "Tap ▾ to collapse the toolbar into a small chip while you browse. Tap the chip anytime to bring the full review tools back.",
+        target: '[data-action="collapse"]',
       },
       {
         title: "Drop a comment pin",
@@ -1380,8 +1445,18 @@ type SessionInfo = {
     renderNotesPanel();
     setBrowseActive(true);
 
+    try {
+      if (sessionStorage.getItem(COLLAPSE_KEY) === "1") {
+        setToolbarCollapsed(true);
+      }
+    } catch {
+      /* ignore */
+    }
+
     // First visit on this device/browser → gentle coachmarks.
-    window.setTimeout(() => startTour(false), 450);
+    window.setTimeout(() => {
+      if (!toolbarCollapsed) startTour(false);
+    }, 450);
   }
 
   const token = readToken();
