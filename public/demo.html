@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Pinlane demo site</title>
+    <style>
+      :root { color-scheme: light; }
+      body {
+        margin: 0;
+        font-family: "DM Sans", system-ui, sans-serif;
+        color: #0b1f2a;
+        background: linear-gradient(180deg, #f7fafb, #e8f0f4);
+        min-height: 100vh;
+      }
+      main { max-width: 720px; margin: 0 auto; padding: 64px 24px; }
+      h1 { font-size: 2.5rem; line-height: 1.1; }
+      p { font-size: 1.1rem; color: #5a6e7a; }
+      .cta {
+        display: inline-block; margin-top: 24px; background: #e85d4c; color: #fff;
+        padding: 12px 20px; border-radius: 999px; text-decoration: none; font-weight: 600;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Acme staging homepage</h1>
+      <p>
+        This page is a stand-in client site. After you claim a Pinlane review
+        invite, reload with the session token so the embed toolbar appears.
+      </p>
+      <a class="cta" href="#order">Order for pickup</a>
+      <p id="order" style="margin-top: 80px">
+        Footer links and secondary copy live down here for highlight practice.
+      </p>
+    </main>
+    <script>
+      // Replace pk_… with your project public key from Pinlane setup.
+      // For local demos the seed/setup screen shows the real key and host.
+      const params = new URLSearchParams(location.search);
+      const key = params.get("pk");
+      if (key) {
+        const s = document.createElement("script");
+        s.src = "/embed.js";
+        s.async = true;
+        s.dataset.project = key;
+        document.body.appendChild(s);
+      } else {
+        console.info("Add ?pk=YOUR_PUBLIC_KEY to load the Pinlane embed.");
+      }
+    </script>
+  </body>
+</html>
