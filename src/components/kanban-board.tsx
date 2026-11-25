@@ -9,7 +9,6 @@ import {
   useSensor,
   useSensors,
   type DragEndEvent,
-  type DragOverEvent,
   type DragStartEvent,
   closestCorners,
 } from "@dnd-kit/core";
@@ -87,12 +86,39 @@ function statusLabel(status: string) {
   }
 }
 
-function reindex(list: BoardCardView[], status: ColumnId): BoardCardView[] {
-  return list.map((card, index) => ({
-    ...card,
-    status,
-    position: index + 1,
-  }));
+function columnOf(card: BoardCardView): ColumnId {
+  return isColumnId(card.status) ? card.status : "open";
+}
+
+/** Group cards into columns without duplicating ids. */
+function groupByColumn(cards: BoardCardView[]): Record<ColumnId, BoardCardView[]> {
+  const map: Record<ColumnId, BoardCardView[]> = {
+    open: [],
+    in_progress: [],
+    done: [],
+  };
+  const seen = new Set<string>();
+  for (const card of cards) {
+    if (seen.has(card.id)) continue;
+    seen.add(card.id);
+    map[columnOf(card)].push(card);
+  }
+  for (const col of COLUMNS) {
+    map[col.id].sort((a, b) => a.position - b.position);
+  }
+  return map;
+}
+
+function flattenColumns(
+  columns: Record<ColumnId, BoardCardView[]>,
+): BoardCardView[] {
+  const next: BoardCardView[] = [];
+  for (const col of COLUMNS) {
+    columns[col.id].forEach((card, index) => {
+      next.push({ ...card, status: col.id, position: index + 1 });
+    });
+  }
+  return next;
 }
 
 function CardItem({
@@ -116,8 +142,8 @@ function CardItem({
 
   const style = {
     transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.35 : 1,
+    transition: isDragging ? undefined : transition,
+    opacity: isDragging ? 0.4 : 1,
   };
 
   return (
@@ -225,102 +251,52 @@ export function KanbanBoard({
   projectId: string;
   initialCards: BoardCardView[];
 }) {
-  const [cards, setCards] = useState(initialCards);
+  const [cards, setCards] = useState(() =>
+    flattenColumns(groupByColumn(initialCards)),
+  );
   const [activeId, setActiveId] = useState<string | null>(null);
   const [selected, setSelected] = useState<BoardCardView | null>(null);
   const [reply, setReply] = useState("");
   const [saving, setSaving] = useState(false);
   const snapshotRef = useRef<BoardCardView[] | null>(null);
-  const cardsRef = useRef(cards);
-  cardsRef.current = cards;
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
   );
 
-  const byColumn = useMemo(() => {
-    const map: Record<ColumnId, BoardCardView[]> = {
-      open: [],
-      in_progress: [],
-      done: [],
-    };
-    for (const card of cards) {
-      const status = isColumnId(card.status) ? card.status : "open";
-      map[status].push(card);
-    }
-    for (const key of COLUMNS) {
-      map[key.id].sort((a, b) => a.position - b.position);
-    }
-    return map;
-  }, [cards]);
+  const byColumn = useMemo(() => groupByColumn(cards), [cards]);
+  const activeCard = activeId
+    ? cards.find((c) => c.id === activeId) ?? null
+    : null;
 
-  const activeCard = cards.find((c) => c.id === activeId) ?? null;
-
-  async function persistCard(
-    cardId: string,
-    patch: { status: string; position: number },
-  ) {
-    const res = await fetch(`/api/board/${cardId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(patch),
-    });
-    if (!res.ok) throw new Error("Update failed");
-    return res.json();
+  async function persistColumn(list: BoardCardView[], status: ColumnId) {
+    await Promise.all(
+      list.map((card, index) =>
+        fetch(`/api/board/${card.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status, position: index + 1 }),
+        }).then((res) => {
+          if (!res.ok) throw new Error("Update failed");
+        }),
+      ),
+    );
   }
 
-  function findContainer(id: string): ColumnId | null {
+  function findContainer(
+    id: string,
+    columns: Record<ColumnId, BoardCardView[]>,
+  ): ColumnId | null {
     if (isColumnId(id)) return id;
-    const card = cardsRef.current.find((c) => c.id === id);
-    if (!card) return null;
-    return isColumnId(card.status) ? card.status : "open";
+    for (const col of COLUMNS) {
+      if (columns[col.id].some((c) => c.id === id)) return col.id;
+    }
+    return null;
   }
 
   function onDragStart(event: DragStartEvent) {
     snapshotRef.current = cards;
     setActiveId(String(event.active.id));
-  }
-
-  function onDragOver(event: DragOverEvent) {
-    const { active, over } = event;
-    if (!over) return;
-
-    const activeCardId = String(active.id);
-    const overId = String(over.id);
-    const from = findContainer(activeCardId);
-    const to = findContainer(overId);
-    if (!from || !to || from === to) return;
-
-    setCards((prev) => {
-      const moving = prev.find((c) => c.id === activeCardId);
-      if (!moving) return prev;
-
-      const without = prev.filter((c) => c.id !== activeCardId);
-      const targetList = without
-        .filter((c) => c.status === to)
-        .sort((a, b) => a.position - b.position);
-
-      let insertAt = targetList.length;
-      if (!isColumnId(overId)) {
-        const overIndex = targetList.findIndex((c) => c.id === overId);
-        if (overIndex >= 0) insertAt = overIndex;
-      }
-
-      const nextTarget = [...targetList];
-      nextTarget.splice(insertAt, 0, { ...moving, status: to });
-
-      const others = without.filter((c) => c.status !== to);
-      return [
-        ...others,
-        ...reindex(nextTarget, to),
-        ...reindex(
-          without
-            .filter((c) => c.status === from)
-            .sort((a, b) => a.position - b.position),
-          from,
-        ),
-      ];
-    });
   }
 
   async function onDragEnd(event: DragEndEvent) {
@@ -335,67 +311,68 @@ export function KanbanBoard({
     }
 
     const overId = String(over.id);
-    const from = findContainer(cardId);
-    const to = findContainer(overId);
+    const columns = groupByColumn(cards);
+    const from = findContainer(cardId, columns);
+    const to = findContainer(overId, columns);
+
     if (!from || !to) {
       snapshotRef.current = null;
       return;
     }
 
-    let nextCards = cards;
+    let nextColumns: Record<ColumnId, BoardCardView[]>;
 
     if (from === to) {
-      const columnCards = byColumn[from];
-      const oldIndex = columnCards.findIndex((c) => c.id === cardId);
-      let newIndex = columnCards.findIndex((c) => c.id === overId);
-      if (isColumnId(overId)) newIndex = columnCards.length - 1;
+      const original = columns[from];
+      const oldIndex = original.findIndex((c) => c.id === cardId);
+      let newIndex = original.findIndex((c) => c.id === overId);
+      if (isColumnId(overId)) newIndex = original.length - 1;
       if (oldIndex < 0 || newIndex < 0 || oldIndex === newIndex) {
         snapshotRef.current = null;
         return;
       }
-      const reordered = reindex(arrayMove(columnCards, oldIndex, newIndex), from);
-      const others = cards.filter((c) => c.status !== from);
-      nextCards = [...others, ...reordered];
-      setCards(nextCards);
+      nextColumns = {
+        ...columns,
+        [from]: arrayMove(original, oldIndex, newIndex),
+      };
     } else {
-      // onDragOver already moved cross-column; ensure final order vs drop target
-      nextCards = cards;
-      const columnCards = nextCards
-        .filter((c) => c.status === to)
-        .sort((a, b) => a.position - b.position);
-      const oldIndex = columnCards.findIndex((c) => c.id === cardId);
-      let newIndex = columnCards.findIndex((c) => c.id === overId);
-      if (isColumnId(overId)) newIndex = columnCards.length - 1;
-      if (oldIndex >= 0 && newIndex >= 0 && oldIndex !== newIndex) {
-        const reordered = reindex(
-          arrayMove(columnCards, oldIndex, newIndex),
-          to,
-        );
-        const others = nextCards.filter((c) => c.status !== to);
-        nextCards = [...others, ...reordered];
-        setCards(nextCards);
+      const fromList = columns[from].filter((c) => c.id !== cardId);
+      const moved = columns[from].find((c) => c.id === cardId);
+      if (!moved) {
+        snapshotRef.current = null;
+        return;
       }
+      const toList = [...columns[to]];
+      let insertAt = toList.length;
+      if (!isColumnId(overId)) {
+        const overIndex = toList.findIndex((c) => c.id === overId);
+        if (overIndex >= 0) insertAt = overIndex;
+      }
+      toList.splice(insertAt, 0, moved);
+      nextColumns = {
+        ...columns,
+        [from]: fromList,
+        [to]: toList,
+      };
     }
 
-    const moved = nextCards.find((c) => c.id === cardId);
-    if (!moved) {
-      snapshotRef.current = null;
-      return;
-    }
+    const nextCards = flattenColumns(nextColumns);
+    setCards(nextCards);
 
+    const touched = new Set<ColumnId>([from, to]);
     try {
-      // Persist the moved card; also sync sibling positions in the destination column
-      const dest = nextCards
-        .filter((c) => c.status === moved.status)
-        .sort((a, b) => a.position - b.position);
       await Promise.all(
-        dest.map((c) =>
-          persistCard(c.id, { status: c.status, position: c.position }),
+        [...touched].map((status) =>
+          persistColumn(
+            nextCards.filter((c) => c.status === status),
+            status,
+          ),
         ),
       );
+      const updated = nextCards.find((c) => c.id === cardId);
       setSelected((prev) =>
-        prev && prev.id === cardId
-          ? { ...prev, status: moved.status, position: moved.position }
+        prev && prev.id === cardId && updated
+          ? { ...prev, status: updated.status, position: updated.position }
           : prev,
       );
     } catch {
@@ -408,41 +385,42 @@ export function KanbanBoard({
 
   async function changeStatus(cardId: string, status: ColumnId) {
     const snapshot = cards;
-    const source = cards
-      .filter((c) => c.id !== cardId && c.status === status)
-      .sort((a, b) => a.position - b.position);
-    const moving = cards.find((c) => c.id === cardId);
-    if (!moving || moving.status === status) return;
+    const columns = groupByColumn(cards);
+    const from = findContainer(cardId, columns);
+    if (!from || from === status) return;
 
-    const dest = reindex([...source, { ...moving, status }], status);
-    const fromStatus = isColumnId(moving.status) ? moving.status : "open";
-    const remaining = reindex(
-      cards
-        .filter((c) => c.id !== cardId && c.status === fromStatus)
-        .sort((a, b) => a.position - b.position),
-      fromStatus,
-    );
-    const others = cards.filter(
-      (c) => c.id !== cardId && c.status !== status && c.status !== fromStatus,
-    );
-    const next = [...others, ...dest, ...remaining];
-    setCards(next);
+    const fromList = columns[from].filter((c) => c.id !== cardId);
+    const moving = columns[from].find((c) => c.id === cardId);
+    if (!moving) return;
+
+    const toList = [...columns[status], moving];
+    const nextCards = flattenColumns({
+      ...columns,
+      [from]: fromList,
+      [status]: toList,
+    });
+    setCards(nextCards);
     setSelected((prev) =>
       prev && prev.id === cardId
         ? {
             ...prev,
             status,
-            position: dest.find((c) => c.id === cardId)?.position ?? prev.position,
+            position: toList.length,
           }
         : prev,
     );
 
     try {
-      await Promise.all(
-        dest.map((c) =>
-          persistCard(c.id, { status: c.status, position: c.position }),
+      await Promise.all([
+        persistColumn(
+          nextCards.filter((c) => c.status === from),
+          from,
         ),
-      );
+        persistColumn(
+          nextCards.filter((c) => c.status === status),
+          status,
+        ),
+      ]);
     } catch {
       toast.error("Could not update status");
       setCards(snapshot);
@@ -486,7 +464,6 @@ export function KanbanBoard({
         sensors={sensors}
         collisionDetection={closestCorners}
         onDragStart={onDragStart}
-        onDragOver={onDragOver}
         onDragEnd={onDragEnd}
         onDragCancel={() => {
           if (snapshotRef.current) setCards(snapshotRef.current);
@@ -505,7 +482,7 @@ export function KanbanBoard({
             />
           ))}
         </div>
-        <DragOverlay>
+        <DragOverlay dropAnimation={null}>
           {activeCard ? (
             <div className="w-72 rounded-xl border bg-white p-3 shadow-2xl ring-1 ring-black/5">
               <p className="text-sm font-medium leading-snug">
@@ -635,7 +612,8 @@ export function KanbanBoard({
                         <p className="font-medium">
                           {r.authorName}{" "}
                           <span className="text-xs font-normal text-muted-foreground">
-                            · {r.authorType === "member" ? "team" : r.authorType}
+                            ·{" "}
+                            {r.authorType === "member" ? "team" : r.authorType}
                           </span>
                         </p>
                         <p className="mt-1">{r.body}</p>
