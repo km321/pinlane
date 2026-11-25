@@ -19,6 +19,10 @@ export const metadata: Metadata = {
     "Open-source visual feedback for agencies. Clients pin comments on live sites; every note lands on your Kanban — and agents can work tickets over MCP.",
 };
 
+// DB-backed pages must not prerender at build time (Postgres isn't reachable
+// inside the Railway image build).
+export const dynamic = "force-dynamic";
+
 export default function RootLayout({
   children,
 }: Readonly<{
