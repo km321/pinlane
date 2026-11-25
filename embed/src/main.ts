@@ -403,7 +403,7 @@ type SessionInfo = {
         pointer-events: none !important;
       }
       * { box-sizing: border-box; font-family: "DM Sans", system-ui, sans-serif; }
-      .toolbar, .launcher, .panel, .overlay, .composer, .toast, .tour-backdrop, .tour-card,
+      .toolbar, .launcher, .placement-bar, .panel, .overlay, .composer, .toast, .tour-backdrop, .tour-card,
       .pin-marker, .rect-marker, .powered, .panel * {
         pointer-events: auto;
       }
@@ -415,7 +415,9 @@ type SessionInfo = {
         transition: opacity .18s ease, transform .18s ease;
         max-width: calc(100vw - 24px);
       }
-      .toolbar.collapsed { display: none; }
+      .toolbar.collapsed,
+      .toolbar.placing { display: none; }
+      .launcher.placing { display: none !important; }
       .toolbar-meta {
         display: flex; align-items: center; gap: 8px; min-width: 0;
       }
@@ -454,6 +456,37 @@ type SessionInfo = {
       .btn.active, .btn.primary { background: ${color}; color: #fff; }
       .overlay {
         position: fixed; inset: 0; z-index: 2147483645; cursor: crosshair;
+        touch-action: none; -webkit-user-select: none; user-select: none;
+        background: rgba(11,31,42,.04);
+      }
+      .overlay.pinning { cursor: crosshair; }
+      .crosshair {
+        position: absolute; width: 44px; height: 44px; margin: -22px 0 0 -22px;
+        border: 2px solid #fff; border-radius: 999px; pointer-events: none;
+        box-shadow: 0 0 0 2px ${color}, 0 8px 20px rgba(0,0,0,.25);
+        background: ${color}55;
+      }
+      .crosshair::after {
+        content: ""; position: absolute; left: 50%; top: 50%;
+        width: 8px; height: 8px; margin: -4px 0 0 -4px;
+        border-radius: 999px; background: #fff;
+      }
+      .placement-bar {
+        display: none; position: fixed; left: 0; right: 0; top: 0;
+        z-index: 2147483647; align-items: center; justify-content: space-between;
+        gap: 10px; padding: calc(10px + env(safe-area-inset-top, 0px)) 14px 12px;
+        background: ${sidebar}; color: #fff;
+        box-shadow: 0 8px 28px rgba(11,31,42,.28);
+      }
+      .placement-bar.visible { display: flex; }
+      .placement-bar p {
+        margin: 0; font-size: 13px; font-weight: 600; line-height: 1.3; flex: 1;
+      }
+      .placement-bar button {
+        border: 0; border-radius: calc(${radius} * 2); padding: 10px 14px;
+        min-height: 44px; font: inherit; font-size: 13px; font-weight: 700;
+        cursor: pointer; background: rgba(255,255,255,.14); color: #fff;
+        touch-action: manipulation;
       }
       .pins-layer {
         position: fixed; inset: 0; z-index: 2147483644; pointer-events: none;
@@ -785,8 +818,33 @@ type SessionInfo = {
     launcher.append(launcherChev, launcherLabel);
     shadow.appendChild(launcher);
 
+    const placementBar = document.createElement("div");
+    placementBar.className = "placement-bar";
+    placementBar.innerHTML = `
+      <p data-placement-copy>Tap to place a pin</p>
+      <button type="button" data-placement-cancel>Cancel</button>
+    `;
+    shadow.appendChild(placementBar);
+    const placementCopy = placementBar.querySelector(
+      "[data-placement-copy]",
+    ) as HTMLParagraphElement;
+
     let toolbarCollapsed = false;
     const COLLAPSE_KEY = "pinlane_toolbar_collapsed";
+
+    function isCoarsePointer() {
+      return (
+        window.innerWidth <= 900 ||
+        window.matchMedia("(pointer: coarse)").matches
+      );
+    }
+
+    function setPlacementChrome(active: boolean, copy?: string) {
+      placementBar.classList.toggle("visible", active);
+      toolbar.classList.toggle("placing", active);
+      launcher.classList.toggle("placing", active);
+      if (copy) placementCopy.textContent = copy;
+    }
 
     function setToolbarCollapsed(collapsed: boolean) {
       toolbarCollapsed = collapsed;
@@ -892,6 +950,7 @@ type SessionInfo = {
       dragStart = null;
       draftRect = null;
       mode = null;
+      setPlacementChrome(false);
       toolbar
         .querySelectorAll(".btn[data-mode]")
         .forEach((b) => b.classList.remove("active"));
@@ -1355,6 +1414,52 @@ type SessionInfo = {
       });
     }
 
+    function placePinAt(clientX: number, clientY: number) {
+      if (!overlay) return;
+      const target = pageTargetFromPoint(clientX, clientY);
+      overlay.querySelectorAll(".crosshair").forEach((el) => el.remove());
+      const marker = document.createElement("div");
+      marker.className = "pin-marker";
+      marker.style.left = `${clientX}px`;
+      marker.style.top = `${clientY}px`;
+      marker.textContent = "+";
+      overlay.appendChild(marker);
+      const highlight = capturePinHighlight(clientX, clientY, target);
+      // Keep the big dock hidden on phones while the composer is open
+      placementBar.classList.remove("visible");
+      if (isCoarsePointer()) toolbar.classList.add("placing");
+      else setPlacementChrome(false);
+      openComposer(highlight, clientX, clientY);
+    }
+
+    function finishRectAt(clientX: number, clientY: number) {
+      if (!dragStart) return;
+      const x = Math.min(dragStart.x, clientX);
+      const y = Math.min(dragStart.y, clientY);
+      const w = Math.abs(clientX - dragStart.x);
+      const h = Math.abs(clientY - dragStart.y);
+      const minSize = isCoarsePointer() ? 24 : 8;
+      if (w < minSize || h < minSize) {
+        // Treat tiny gestures as a pin instead of aborting on mobile
+        if (isCoarsePointer()) {
+          placePinAt(clientX, clientY);
+          dragStart = null;
+          return;
+        }
+        clearOverlay();
+        return;
+      }
+      const cx = x + w / 2;
+      const cy = y + h / 2;
+      const target = pageTargetFromPoint(cx, cy);
+      const highlight = captureRectHighlight(x, y, w, h, target);
+      dragStart = null;
+      placementBar.classList.remove("visible");
+      if (isCoarsePointer()) toolbar.classList.add("placing");
+      else setPlacementChrome(false);
+      openComposer(highlight, clientX, clientY);
+    }
+
     function startMode(next: "pin" | "rect") {
       overlay?.remove();
       overlay = null;
@@ -1363,63 +1468,137 @@ type SessionInfo = {
       shadow.querySelectorAll(".composer").forEach((el) => el.remove());
       mode = next;
       setBrowseActive(false);
+      setPanelOpen(false);
       toolbar
         .querySelectorAll(".btn[data-mode]")
         .forEach((b) => b.classList.remove("active"));
       toolbar.querySelector(`[data-mode="${next}"]`)?.classList.add("active");
+
+      const mobile = isCoarsePointer();
+      if (mobile) {
+        setPlacementChrome(
+          true,
+          next === "pin"
+            ? "Tap the spot to drop a pin"
+            : "Drag with your finger to highlight",
+        );
+      } else {
+        setPlacementChrome(false);
+      }
+
       overlay = document.createElement("div");
-      overlay.className = "overlay";
+      overlay.className =
+        next === "pin" ? "overlay pinning" : "overlay";
       shadow.appendChild(overlay);
 
+      let crosshair: HTMLDivElement | null = null;
+      let pointing = false;
+
+      function moveCrosshair(x: number, y: number) {
+        if (!overlay) return;
+        if (!crosshair) {
+          crosshair = document.createElement("div");
+          crosshair.className = "crosshair";
+          overlay.appendChild(crosshair);
+        }
+        crosshair.style.left = `${x}px`;
+        crosshair.style.top = `${y}px`;
+      }
+
+      function updateDraft(x: number, y: number) {
+        if (!dragStart || !draftRect) return;
+        const left = Math.min(dragStart.x, x);
+        const top = Math.min(dragStart.y, y);
+        draftRect.style.left = `${left}px`;
+        draftRect.style.top = `${top}px`;
+        draftRect.style.width = `${Math.abs(x - dragStart.x)}px`;
+        draftRect.style.height = `${Math.abs(y - dragStart.y)}px`;
+      }
+
       if (next === "pin") {
-        overlay.addEventListener("click", (e) => {
-          const target = pageTargetFromPoint(e.clientX, e.clientY);
-          const marker = document.createElement("div");
-          marker.className = "pin-marker";
-          marker.style.left = `${e.clientX}px`;
-          marker.style.top = `${e.clientY}px`;
-          marker.textContent = "+";
-          overlay!.appendChild(marker);
-          const highlight = capturePinHighlight(e.clientX, e.clientY, target);
-          openComposer(highlight, e.clientX, e.clientY);
+        overlay.addEventListener(
+          "pointerdown",
+          (e) => {
+            if (e.pointerType === "mouse" && e.button !== 0) return;
+            e.preventDefault();
+            pointing = true;
+            moveCrosshair(e.clientX, e.clientY);
+            try {
+              overlay!.setPointerCapture(e.pointerId);
+            } catch {
+              /* ignore */
+            }
+          },
+          { passive: false },
+        );
+        overlay.addEventListener(
+          "pointermove",
+          (e) => {
+            if (!pointing) return;
+            e.preventDefault();
+            moveCrosshair(e.clientX, e.clientY);
+          },
+          { passive: false },
+        );
+        overlay.addEventListener("pointerup", (e) => {
+          if (!pointing) return;
+          e.preventDefault();
+          pointing = false;
+          // Place where the finger/cursor lifted — drag to fine-tune first
+          placePinAt(e.clientX, e.clientY);
+        });
+        overlay.addEventListener("pointercancel", () => {
+          pointing = false;
+          crosshair?.remove();
+          crosshair = null;
         });
       } else {
-        overlay.addEventListener("mousedown", (e) => {
-          dragStart = { x: e.clientX, y: e.clientY };
-          draftRect = document.createElement("div");
-          draftRect.className = "rect";
-          overlay!.appendChild(draftRect);
-        });
-        overlay.addEventListener("mousemove", (e) => {
-          if (!dragStart || !draftRect) return;
-          const x = Math.min(dragStart.x, e.clientX);
-          const y = Math.min(dragStart.y, e.clientY);
-          const w = Math.abs(e.clientX - dragStart.x);
-          const h = Math.abs(e.clientY - dragStart.y);
-          draftRect.style.left = `${x}px`;
-          draftRect.style.top = `${y}px`;
-          draftRect.style.width = `${w}px`;
-          draftRect.style.height = `${h}px`;
-        });
-        overlay.addEventListener("mouseup", (e) => {
+        overlay.addEventListener(
+          "pointerdown",
+          (e) => {
+            if (e.pointerType === "mouse" && e.button !== 0) return;
+            e.preventDefault();
+            dragStart = { x: e.clientX, y: e.clientY };
+            draftRect = document.createElement("div");
+            draftRect.className = "rect";
+            overlay!.appendChild(draftRect);
+            updateDraft(e.clientX, e.clientY);
+            try {
+              overlay!.setPointerCapture(e.pointerId);
+            } catch {
+              /* ignore */
+            }
+          },
+          { passive: false },
+        );
+        overlay.addEventListener(
+          "pointermove",
+          (e) => {
+            if (!dragStart) return;
+            e.preventDefault();
+            updateDraft(e.clientX, e.clientY);
+          },
+          { passive: false },
+        );
+        overlay.addEventListener("pointerup", (e) => {
           if (!dragStart) return;
-          const x = Math.min(dragStart.x, e.clientX);
-          const y = Math.min(dragStart.y, e.clientY);
-          const w = Math.abs(e.clientX - dragStart.x);
-          const h = Math.abs(e.clientY - dragStart.y);
-          if (w < 8 || h < 8) {
-            clearOverlay();
-            return;
-          }
-          const cx = x + w / 2;
-          const cy = y + h / 2;
-          const target = pageTargetFromPoint(cx, cy);
-          const highlight = captureRectHighlight(x, y, w, h, target);
-          openComposer(highlight, e.clientX, e.clientY);
+          e.preventDefault();
+          finishRectAt(e.clientX, e.clientY);
+        });
+        overlay.addEventListener("pointercancel", () => {
           dragStart = null;
+          draftRect?.remove();
+          draftRect = null;
         });
       }
     }
+
+    placementBar
+      .querySelector("[data-placement-cancel]")!
+      .addEventListener("click", () => {
+        enterBrowseMode();
+        toast("Back to browsing");
+      });
 
     toolbar.addEventListener("click", (e) => {
       const btn = (e.target as HTMLElement).closest("button");
