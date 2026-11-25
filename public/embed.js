@@ -18,6 +18,7 @@
         background: ${c}; color: #fff; padding: 10px 12px;
         border-radius: calc(${d} * 2); box-shadow: 0 12px 40px rgba(11,31,42,.35);
       }
+      /* Keep chrome above live pins/highlights so markers never cover the sidebar. */
       .brand-wrap { display: flex; align-items: center; gap: 8px; margin-right: 4px; }
       .brand-logo { height: 18px; width: auto; max-width: 72px; object-fit: contain; }
       .brand { font-weight: 700; font-size: 13px; letter-spacing: .02em; }
@@ -31,7 +32,7 @@
         position: fixed; inset: 0; z-index: 2147483645; cursor: crosshair;
       }
       .pins-layer {
-        position: fixed; inset: 0; z-index: 2147483647; pointer-events: none;
+        position: fixed; inset: 0; z-index: 2147483644; pointer-events: none;
       }
       .pin-marker {
         position: absolute; min-width: 24px; height: 24px; padding: 0 6px;
@@ -59,7 +60,10 @@
         transform: translateX(105%); transition: transform .22s ease;
         display: flex; flex-direction: column; pointer-events: auto;
       }
-      .panel.open { transform: translateX(0); }
+      .panel.open {
+        transform: translateX(0);
+        z-index: 2147483647;
+      }
       .panel-header {
         display: flex; align-items: center; justify-content: space-between; gap: 8px;
         padding: 14px 16px; background: ${c}; color: #fff;
