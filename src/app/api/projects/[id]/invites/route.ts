@@ -9,6 +9,7 @@ import { requireApiWorkspace } from "@/lib/session";
 
 const createSchema = z.object({
   label: z.string().min(1).max(120).default("Client review"),
+  assignedName: z.string().min(1).max(80).nullable().optional(),
   expiresInDays: z.number().int().min(1).max(365).optional(),
 });
 
@@ -58,6 +59,7 @@ export async function POST(
       projectId: id,
       token: newToken(18),
       label: body.label,
+      assignedName: body.assignedName?.trim() || null,
       expiresAt,
     })
     .returning();

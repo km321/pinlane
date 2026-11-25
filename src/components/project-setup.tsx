@@ -10,6 +10,7 @@ type Invite = {
   id: string;
   token: string;
   label: string;
+  assignedName: string | null;
   createdAt: string | Date;
 };
 
@@ -32,6 +33,7 @@ export function ProjectSetup({
 }) {
   const [invites, setInvites] = useState(initialInvites);
   const [label, setLabel] = useState("Client review");
+  const [assignedName, setAssignedName] = useState("");
   const [repo, setRepo] = useState(githubRepo ?? "");
   const [projectUrl, setProjectUrl] = useState(githubProjectUrl ?? "");
   const [saving, setSaving] = useState(false);
@@ -49,11 +51,15 @@ export function ProjectSetup({
       const res = await fetch(`/api/projects/${projectId}/invites`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ label }),
+        body: JSON.stringify({
+          label,
+          assignedName: assignedName.trim() || null,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed");
       setInvites((prev) => [data.invite, ...prev]);
+      setAssignedName("");
       await copy(data.url, "Review link copied");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed");
@@ -102,23 +108,38 @@ export function ProjectSetup({
       </section>
 
       <section className="rounded-2xl border bg-white p-5">
-        <h2 className="font-heading text-lg font-semibold">Review invites</h2>
+        <h2 className="font-heading text-lg font-semibold">Review links</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Clients claim a session and get redirected to the live site.
+          Create as many links as you need — one per teammate or client. Name a
+          link to skip the name form; leave blank so they type their name each
+          session.
         </p>
-        <div className="mt-4 flex gap-2">
-          <Input
-            value={label}
-            onChange={(e) => setLabel(e.target.value)}
-            placeholder="Invite label"
-          />
-          <Button onClick={createInvite} disabled={saving}>
+        <div className="mt-4 space-y-3">
+          <div className="space-y-2">
+            <Label htmlFor="invite-label">Link label</Label>
+            <Input
+              id="invite-label"
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+              placeholder="Alex — homepage pass"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="assigned-name">Reviewer name (optional)</Label>
+            <Input
+              id="assigned-name"
+              value={assignedName}
+              onChange={(e) => setAssignedName(e.target.value)}
+              placeholder="Alex Chen"
+            />
+          </div>
+          <Button onClick={createInvite} disabled={saving || !label.trim()}>
             Create link
           </Button>
         </div>
         <ul className="mt-4 space-y-2">
           {invites.length === 0 ? (
-            <li className="text-sm text-muted-foreground">No invites yet.</li>
+            <li className="text-sm text-muted-foreground">No links yet.</li>
           ) : (
             invites.map((invite) => {
               const url = `${appUrl}/r/${invite.token}`;
@@ -127,7 +148,14 @@ export function ProjectSetup({
                   key={invite.id}
                   className="flex items-center justify-between gap-2 rounded-lg bg-muted/50 px-3 py-2 text-sm"
                 >
-                  <span className="truncate">{invite.label}</span>
+                  <div className="min-w-0">
+                    <p className="truncate font-medium">{invite.label}</p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {invite.assignedName
+                        ? `Named for ${invite.assignedName}`
+                        : "Asks for name each session"}
+                    </p>
+                  </div>
                   <Button
                     size="sm"
                     variant="ghost"

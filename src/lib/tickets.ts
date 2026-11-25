@@ -146,6 +146,7 @@ export async function createFeedbackWithCard(opts: {
   pageTitle?: string;
   comment: string;
   highlight: HighlightPayload;
+  screenshotUrl?: string;
 }) {
   const feedbackId = newId("fb");
   const cardId = newId("card");
@@ -170,6 +171,7 @@ export async function createFeedbackWithCard(opts: {
       pageTitle: opts.pageTitle,
       comment: opts.comment,
       highlight: opts.highlight,
+      screenshotUrl: opts.screenshotUrl,
     })
     .returning();
 
@@ -191,11 +193,24 @@ export function formatTicketForAgent(
   card: NonNullable<Awaited<ReturnType<typeof getTicket>>>,
 ) {
   const fb = card.feedbackItem;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") || "";
+  const openUrl = appUrl ? `${appUrl}/go/${fb.id}` : null;
+  let deepLink = fb.pageUrl;
+  try {
+    const url = new URL(fb.pageUrl);
+    url.hash = `pinlane-pin=${fb.id}`;
+    deepLink = url.toString();
+  } catch {
+    /* keep pageUrl */
+  }
+
   return {
     id: card.id,
     status: card.status,
     githubIssueUrl: card.githubIssueUrl,
     position: card.position,
+    openUrl,
+    deepLink,
     project: {
       id: card.project.id,
       name: card.project.name,
@@ -210,6 +225,7 @@ export function formatTicketForAgent(
       pageUrl: fb.pageUrl,
       pageTitle: fb.pageTitle,
       highlight: fb.highlight,
+      screenshotUrl: fb.screenshotUrl,
       createdAt: fb.createdAt,
       replies: fb.replies.map((r) => ({
         id: r.id,

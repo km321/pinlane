@@ -9,6 +9,7 @@ import {
 } from "@/db/schema";
 import { embedCorsHeaders, optionsResponse } from "@/lib/cors";
 import { createFeedbackWithCard } from "@/lib/tickets";
+import { buildPinDeepLink, pinOpenPath } from "@/lib/branding";
 
 export function OPTIONS(req: Request) {
   return optionsResponse(req);
@@ -28,6 +29,14 @@ const schema = z.object({
     h: z.number().optional(),
     selector: z.string().optional(),
   }),
+  screenshotUrl: z
+    .string()
+    .max(1_500_000)
+    .optional()
+    .refine(
+      (v) => !v || v.startsWith("data:image/") || /^https?:\/\//i.test(v),
+      { message: "screenshot must be a data URL or http(s) URL" },
+    ),
 });
 
 export async function POST(req: Request) {
@@ -79,12 +88,28 @@ export async function POST(req: Request) {
       pageTitle: body.pageTitle,
       comment: body.comment,
       highlight: body.highlight,
+      screenshotUrl: body.screenshotUrl,
     });
+
+    const appUrl =
+      process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") || "";
 
     return NextResponse.json(
       {
         feedbackId: result.feedback.id,
         cardId: result.card.id,
+        openUrl: appUrl ? `${appUrl}${pinOpenPath(result.feedback.id)}` : null,
+        deepLink: buildPinDeepLink(body.pageUrl, result.feedback.id),
+        pin: {
+          id: result.feedback.id,
+          authorName: result.feedback.authorName,
+          comment: result.feedback.comment,
+          pageUrl: result.feedback.pageUrl,
+          highlight: result.feedback.highlight,
+          screenshotUrl: result.feedback.screenshotUrl,
+          createdAt: result.feedback.createdAt,
+          mine: true,
+        },
       },
       { status: 201, headers },
     );

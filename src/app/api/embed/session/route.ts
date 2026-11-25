@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import {
+  feedbackItems,
   projects,
   reviewInvites,
   reviewSessions,
   workspaces,
 } from "@/db/schema";
+import { brandingFromWorkspace } from "@/lib/branding";
 import { embedCorsHeaders, optionsResponse } from "@/lib/cors";
 
 export function OPTIONS(req: Request) {
@@ -19,6 +21,7 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const publicKey = url.searchParams.get("publicKey");
   const token = url.searchParams.get("token");
+  const pageUrl = url.searchParams.get("pageUrl");
 
   if (!publicKey || !token) {
     return NextResponse.json(
@@ -70,6 +73,16 @@ export async function GET(req: Request) {
     where: eq(workspaces.id, project.workspaceId),
   });
 
+  const allPins = await db.query.feedbackItems.findMany({
+    where: eq(feedbackItems.projectId, project.id),
+    orderBy: [desc(feedbackItems.createdAt)],
+    limit: 200,
+  });
+
+  const pagePins = pageUrl
+    ? allPins.filter((pin) => samePage(pin.pageUrl, pageUrl))
+    : allPins;
+
   return NextResponse.json(
     {
       active: true,
@@ -79,12 +92,31 @@ export async function GET(req: Request) {
         name: project.name,
         siteUrl: project.siteUrl,
       },
-      branding: {
-        name: workspace?.name ?? "Pinlane",
-        logoUrl: workspace?.logoUrl ?? null,
-        primaryColor: workspace?.primaryColor ?? "#E85D4C",
-      },
+      branding: brandingFromWorkspace(workspace),
+      pins: pagePins.map((pin) => ({
+        id: pin.id,
+        authorName: pin.authorName,
+        comment: pin.comment,
+        pageUrl: pin.pageUrl,
+        highlight: pin.highlight,
+        screenshotUrl: pin.screenshotUrl,
+        createdAt: pin.createdAt,
+        mine: pin.sessionId === session.id,
+      })),
     },
     { headers },
   );
+}
+
+function samePage(a: string, b: string) {
+  try {
+    const ua = new URL(a);
+    const ub = new URL(b);
+    return (
+      ua.origin === ub.origin &&
+      ua.pathname.replace(/\/$/, "") === ub.pathname.replace(/\/$/, "")
+    );
+  } catch {
+    return a.split("#")[0].split("?")[0] === b.split("#")[0].split("?")[0];
+  }
 }

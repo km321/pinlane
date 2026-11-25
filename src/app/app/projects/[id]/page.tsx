@@ -44,6 +44,8 @@ export default async function ProjectPage({
       comment: card.feedbackItem.comment,
       pageUrl: card.feedbackItem.pageUrl,
       pageTitle: card.feedbackItem.pageTitle,
+      screenshotUrl: card.feedbackItem.screenshotUrl,
+      openUrl: `${appUrl}/go/${card.feedbackItem.id}`,
       highlight: card.feedbackItem.highlight,
       createdAt: card.feedbackItem.createdAt,
       replies: card.feedbackItem.replies,
@@ -54,7 +56,11 @@ export default async function ProjectPage({
     <AppShell
       title={project.name}
       actions={
-        <Button variant="outline" render={<Link href="/app" />}>
+        <Button
+          variant="outline"
+          nativeButton={false}
+          render={<Link href="/app" />}
+        >
           All projects
         </Button>
       }

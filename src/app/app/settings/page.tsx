@@ -26,6 +26,10 @@ export default async function SettingsPage() {
           name: workspace.name,
           logoUrl: workspace.logoUrl,
           primaryColor: workspace.primaryColor,
+          sidebarColor: workspace.sidebarColor,
+          surfaceColor: workspace.surfaceColor,
+          radius: workspace.radius,
+          showPoweredBy: workspace.showPoweredBy,
         }}
         initialKeys={keys.map((k) => ({
           id: k.id,

@@ -66,6 +66,11 @@ export const workspaces = pgTable("workspaces", {
   slug: text("slug").notNull().unique(),
   logoUrl: text("logo_url"),
   primaryColor: text("primary_color").notNull().default("#E85D4C"),
+  sidebarColor: text("sidebar_color").notNull().default("#0B1F2A"),
+  surfaceColor: text("surface_color").notNull().default("#FFFFFF"),
+  /** Corner rounding in rem units, e.g. 0, 0.5, 0.75, 1, 1.5 */
+  radius: real("radius").notNull().default(0.75),
+  showPoweredBy: boolean("show_powered_by").notNull().default(true),
   ownerId: text("owner_id")
     .notNull()
     .references(() => user.id, { onDelete: "cascade" }),
@@ -126,6 +131,8 @@ export const reviewInvites = pgTable("review_invites", {
     .references(() => projects.id, { onDelete: "cascade" }),
   token: text("token").notNull().unique(),
   label: text("label").notNull().default("Client review"),
+  /** When set, claim skips the name form and uses this as the reviewer name. */
+  assignedName: text("assigned_name"),
   expiresAt: timestamp("expires_at"),
   revokedAt: timestamp("revoked_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),

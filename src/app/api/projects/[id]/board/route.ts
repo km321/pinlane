@@ -23,6 +23,9 @@ export async function GET(
     status: status || undefined,
   });
 
+  const appUrl =
+    process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") || "";
+
   return NextResponse.json({
     project,
     cards: cards.map((card) => ({
@@ -36,6 +39,8 @@ export async function GET(
         comment: card.feedbackItem.comment,
         pageUrl: card.feedbackItem.pageUrl,
         pageTitle: card.feedbackItem.pageTitle,
+        screenshotUrl: card.feedbackItem.screenshotUrl,
+        openUrl: appUrl ? `${appUrl}/go/${card.feedbackItem.id}` : null,
         highlight: card.feedbackItem.highlight,
         createdAt: card.feedbackItem.createdAt,
         replies: card.feedbackItem.replies,

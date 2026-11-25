@@ -8,46 +8,83 @@ import {
   reviewSessions,
   workspaces,
 } from "@/db/schema";
+import { brandingFromWorkspace } from "@/lib/branding";
 import { newId, newToken } from "@/lib/ids";
 
 const schema = z.object({
-  guestName: z.string().min(1).max(80),
+  guestName: z.string().min(1).max(80).optional(),
 });
 
-export async function GET(
-  _req: Request,
-  ctx: { params: Promise<{ token: string }> },
-) {
-  const { token } = await ctx.params;
+async function loadInvite(token: string) {
   const invite = await db.query.reviewInvites.findFirst({
     where: and(eq(reviewInvites.token, token), isNull(reviewInvites.revokedAt)),
   });
-  if (!invite) {
-    return NextResponse.json({ error: "Invite not found" }, { status: 404 });
-  }
+  if (!invite) return { error: "Invite not found" as const, status: 404 as const };
   if (invite.expiresAt && invite.expiresAt < new Date()) {
-    return NextResponse.json({ error: "Invite expired" }, { status: 410 });
+    return { error: "Invite expired" as const, status: 410 as const };
   }
 
   const project = await db.query.projects.findFirst({
     where: eq(projects.id, invite.projectId),
   });
   if (!project) {
-    return NextResponse.json({ error: "Project missing" }, { status: 404 });
+    return { error: "Project missing" as const, status: 404 as const };
   }
 
   const workspace = await db.query.workspaces.findFirst({
     where: eq(workspaces.id, project.workspaceId),
   });
 
+  return { invite, project, workspace };
+}
+
+async function createSession(
+  inviteId: string,
+  guestName: string,
+  projectSiteUrl: string,
+  publicKey: string,
+) {
+  const sessionToken = newToken(24);
+  const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+
+  await db.insert(reviewSessions).values({
+    id: newId("ses"),
+    inviteId,
+    token: sessionToken,
+    guestName: guestName.trim(),
+    expiresAt,
+  });
+
+  const site = new URL(projectSiteUrl);
+  site.searchParams.set("pinlane", sessionToken);
+
+  return {
+    sessionToken,
+    redirectUrl: site.toString(),
+    publicKey,
+  };
+}
+
+export async function GET(
+  _req: Request,
+  ctx: { params: Promise<{ token: string }> },
+) {
+  const { token } = await ctx.params;
+  const loaded = await loadInvite(token);
+  if ("error" in loaded) {
+    return NextResponse.json({ error: loaded.error }, { status: loaded.status });
+  }
+
+  const { invite, project, workspace } = loaded;
+  const branding = brandingFromWorkspace(workspace);
+
   return NextResponse.json({
-    invite: { label: invite.label },
-    project: { name: project.name, siteUrl: project.siteUrl },
-    branding: {
-      name: workspace?.name ?? "Pinlane",
-      logoUrl: workspace?.logoUrl ?? null,
-      primaryColor: workspace?.primaryColor ?? "#E85D4C",
+    invite: {
+      label: invite.label,
+      assignedName: invite.assignedName,
     },
+    project: { name: project.name, siteUrl: project.siteUrl },
+    branding,
   });
 }
 
@@ -56,42 +93,28 @@ export async function POST(
   ctx: { params: Promise<{ token: string }> },
 ) {
   const { token } = await ctx.params;
-  const body = schema.parse(await req.json());
+  const body = schema.parse(await req.json().catch(() => ({})));
 
-  const invite = await db.query.reviewInvites.findFirst({
-    where: and(eq(reviewInvites.token, token), isNull(reviewInvites.revokedAt)),
-  });
-  if (!invite) {
-    return NextResponse.json({ error: "Invite not found" }, { status: 404 });
-  }
-  if (invite.expiresAt && invite.expiresAt < new Date()) {
-    return NextResponse.json({ error: "Invite expired" }, { status: 410 });
+  const loaded = await loadInvite(token);
+  if ("error" in loaded) {
+    return NextResponse.json({ error: loaded.error }, { status: loaded.status });
   }
 
-  const project = await db.query.projects.findFirst({
-    where: eq(projects.id, invite.projectId),
-  });
-  if (!project) {
-    return NextResponse.json({ error: "Project missing" }, { status: 404 });
+  const { invite, project } = loaded;
+  const guestName = (invite.assignedName || body.guestName || "").trim();
+  if (!guestName) {
+    return NextResponse.json(
+      { error: "Name is required for this link" },
+      { status: 400 },
+    );
   }
 
-  const sessionToken = newToken(24);
-  const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+  const session = await createSession(
+    invite.id,
+    guestName,
+    project.siteUrl,
+    project.publicKey,
+  );
 
-  await db.insert(reviewSessions).values({
-    id: newId("ses"),
-    inviteId: invite.id,
-    token: sessionToken,
-    guestName: body.guestName.trim(),
-    expiresAt,
-  });
-
-  const site = new URL(project.siteUrl);
-  site.searchParams.set("pinlane", sessionToken);
-
-  return NextResponse.json({
-    sessionToken,
-    redirectUrl: site.toString(),
-    publicKey: project.publicKey,
-  });
+  return NextResponse.json(session);
 }

@@ -39,6 +39,8 @@ export type BoardCardView = {
     comment: string;
     pageUrl: string;
     pageTitle: string | null;
+    screenshotUrl: string | null;
+    openUrl: string;
     highlight: {
       type: string;
       x: number;
@@ -298,18 +300,52 @@ export function KanbanBoard({
                 <p className="text-base leading-relaxed">
                   {selected.feedback.comment}
                 </p>
-                <div className="space-y-1 text-sm text-muted-foreground">
+                <div className="space-y-3 text-sm text-muted-foreground">
                   <p>From {selected.feedback.authorName}</p>
-                  <p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      size="sm"
+                      render={
+                        <a
+                          href={selected.feedback.openUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                        />
+                      }
+                      nativeButton={false}
+                    >
+                      Open pin on site
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      render={
+                        <a
+                          href={selected.feedback.pageUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                        />
+                      }
+                      nativeButton={false}
+                    >
+                      Page only
+                    </Button>
+                  </div>
+                  {selected.feedback.screenshotUrl ? (
                     <a
-                      href={selected.feedback.pageUrl}
+                      href={selected.feedback.screenshotUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="underline"
+                      className="block overflow-hidden rounded-xl border"
                     >
-                      {selected.feedback.pageTitle || selected.feedback.pageUrl}
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={selected.feedback.screenshotUrl}
+                        alt="Pin context screenshot"
+                        className="max-h-56 w-full object-cover object-top"
+                      />
                     </a>
-                  </p>
+                  ) : null}
                   {selected.feedback.highlight.selector && (
                     <p className="font-mono text-xs">
                       {selected.feedback.highlight.selector}

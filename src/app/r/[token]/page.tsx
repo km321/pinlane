@@ -5,15 +5,12 @@ import { useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import type { Branding } from "@/lib/branding";
 
 type ClaimInfo = {
-  invite: { label: string };
+  invite: { label: string; assignedName: string | null };
   project: { name: string; siteUrl: string };
-  branding: {
-    name: string;
-    logoUrl: string | null;
-    primaryColor: string;
-  };
+  branding: Branding;
 };
 
 export default function ReviewClaimPage() {
@@ -24,13 +21,35 @@ export default function ReviewClaimPage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
     fetch(`/api/review/${params.token}/claim`)
       .then(async (res) => {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Invite unavailable");
+        if (cancelled) return;
         setInfo(data);
+        if (data.invite.assignedName) {
+          setGuestName(data.invite.assignedName);
+          setLoading(true);
+          const claim = await fetch(`/api/review/${params.token}/claim`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({}),
+          });
+          const claimed = await claim.json();
+          if (!claim.ok) throw new Error(claimed.error || "Could not start review");
+          window.location.href = claimed.redirectUrl;
+        }
       })
-      .catch((err) => setError(err.message));
+      .catch((err) => {
+        if (!cancelled) {
+          setError(err.message);
+          setLoading(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [params.token]);
 
   async function onSubmit(e: React.FormEvent) {
@@ -53,16 +72,30 @@ export default function ReviewClaimPage() {
   }
 
   const color = info?.branding.primaryColor || "#E85D4C";
+  const radius = `${info?.branding.radius ?? 0.75}rem`;
+  const surface = info?.branding.surfaceColor || "#FFFFFF";
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-6 py-12">
-      <div className="w-full max-w-md rounded-2xl border bg-white/95 p-8 shadow-xl">
+    <div
+      className="flex min-h-screen items-center justify-center px-6 py-12"
+      style={{
+        background: `linear-gradient(160deg, ${surface} 0%, #f3f6f8 55%, ${color}22 100%)`,
+      }}
+    >
+      <div
+        className="w-full max-w-md border p-8 shadow-xl"
+        style={{
+          backgroundColor: surface,
+          borderRadius: radius,
+          borderColor: "#d5dee5",
+        }}
+      >
         {info?.branding.logoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={info.branding.logoUrl}
             alt={info.branding.name}
-            className="h-10 w-auto"
+            className="h-10 w-auto max-w-[180px] object-contain"
           />
         ) : (
           <div className="font-heading text-2xl font-bold" style={{ color }}>
@@ -75,14 +108,17 @@ export default function ReviewClaimPage() {
             <h1 className="text-xl font-semibold">Invite unavailable</h1>
             <p className="mt-2 text-sm text-muted-foreground">{error}</p>
           </div>
-        ) : !info ? (
-          <p className="mt-8 text-sm text-muted-foreground">Loading review…</p>
+        ) : !info || info.invite.assignedName ? (
+          <p className="mt-8 text-sm text-muted-foreground">
+            {loading ? "Opening the live site…" : "Loading review…"}
+          </p>
         ) : (
           <>
             <h1 className="mt-6 text-xl font-semibold">{info.invite.label}</h1>
             <p className="mt-2 text-sm text-muted-foreground">
               You&apos;re reviewing <strong>{info.project.name}</strong>. Enter
-              your name to open the live site with commenting tools.
+              your name so the team can see who left each pin. Your session
+              keeps pins visible after you send them.
             </p>
             <form onSubmit={onSubmit} className="mt-6 space-y-4">
               <div className="space-y-2">
@@ -93,6 +129,7 @@ export default function ReviewClaimPage() {
                   value={guestName}
                   onChange={(e) => setGuestName(e.target.value)}
                   placeholder="Jordan"
+                  style={{ borderRadius: `calc(${radius} * 0.8)` }}
                 />
               </div>
               {error && <p className="text-sm text-destructive">{error}</p>}
@@ -100,11 +137,16 @@ export default function ReviewClaimPage() {
                 type="submit"
                 className="w-full"
                 disabled={loading}
-                style={{ backgroundColor: color }}
+                style={{ backgroundColor: color, borderRadius: radius }}
               >
                 {loading ? "Opening site…" : "Start reviewing"}
               </Button>
             </form>
+            {info.branding.showPoweredBy ? (
+              <p className="mt-6 text-center text-[10px] uppercase tracking-wide text-muted-foreground">
+                Powered by Pinlane
+              </p>
+            ) : null}
           </>
         )}
       </div>

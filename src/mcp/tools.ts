@@ -39,7 +39,7 @@ export const mcpToolDefinitions = [
   {
     name: "get_ticket",
     description:
-      "Get a ticket with full feedback context: comment, page URL, highlight/selector, and replies.",
+      "Get a ticket with full feedback context: comment, page URL, highlight/selector, screenshotUrl, openUrl (team deep link that shows the pin on the live page), deepLink, and replies.",
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -206,6 +206,8 @@ export async function handleMcpTool(
               fb.pageTitle ? `- Title: ${fb.pageTitle}` : null,
               `- Author: ${fb.authorName}`,
               `- ${selector}`,
+              fb.screenshotUrl ? `- Screenshot available on ticket` : null,
+              `- Open pin: ${process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") || ""}/go/${fb.id}`,
               `- Ticket: ${card.id}`,
               card.project.githubProjectUrl
                 ? `- GitHub Project: ${card.project.githubProjectUrl}`
