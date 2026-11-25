@@ -10,6 +10,24 @@ const nextConfig: NextConfig = {
       },
     },
   },
+  async headers() {
+    return [
+      {
+        // Host sites cache /embed.js aggressively; keep it short + revalidate.
+        source: "/embed.js",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=60, must-revalidate",
+          },
+          {
+            key: "CDN-Cache-Control",
+            value: "public, max-age=60, must-revalidate",
+          },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;

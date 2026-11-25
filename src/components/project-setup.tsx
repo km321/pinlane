@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { embedScriptUrl } from "@/lib/embed-version";
 
 type Invite = {
   id: string;
@@ -38,7 +39,7 @@ export function ProjectSetup({
   const [projectUrl, setProjectUrl] = useState(githubProjectUrl ?? "");
   const [saving, setSaving] = useState(false);
 
-  const snippet = `<script src="${appUrl}/embed.js" data-project="${publicKey}" async></script>`;
+  const snippet = `<script src="${embedScriptUrl(appUrl)}" data-project="${publicKey}" async></script>`;
 
   async function copy(text: string, msg: string) {
     await navigator.clipboard.writeText(text);

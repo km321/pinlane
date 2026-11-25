@@ -42,13 +42,25 @@ Clients never need accounts (magic review links). Named links skip the name form
 
 ```html
 <script
-  src="https://YOUR_HOST/embed.js"
+  src="https://YOUR_HOST/embed.js?v=VERSION"
   data-project="pk_…"
   async
 ></script>
 ```
 
-The widget stays quiet until a valid `?pinlane=SESSION_TOKEN` (from the review claim flow) is present.
+Copy the snippet from project **Setup** — it includes a `?v=` cache-bust. On Next.js:
+
+```tsx
+import Script from "next/script";
+
+<Script
+  src="https://feedback.meltonstudios.com/embed.js?v=20251125c"
+  data-project="pk_…"
+  strategy="afterInteractive"
+/>
+```
+
+Bump the `v=` query (or re-copy the Setup snippet) whenever the widget should refresh. The widget stays quiet until a valid `?pinlane=SESSION_TOKEN` (from the review claim flow) is present.
 
 ## MCP for agents
 
