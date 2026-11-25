@@ -28,6 +28,8 @@ const schema = z.object({
     w: z.number().optional(),
     h: z.number().optional(),
     selector: z.string().optional(),
+    ox: z.number().optional(),
+    oy: z.number().optional(),
   }),
   screenshotUrl: z
     .string()

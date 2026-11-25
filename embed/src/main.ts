@@ -1,15 +1,17 @@
 import html2canvas from "html2canvas";
 
-type PinHighlight =
-  | { type: "pin"; x: number; y: number; selector?: string }
-  | {
-      type: "rect";
-      x: number;
-      y: number;
-      w: number;
-      h: number;
-      selector?: string;
-    };
+type PinHighlight = {
+  type: "pin" | "rect";
+  /** Document-normalized (scrollWidth / scrollHeight). */
+  x: number;
+  y: number;
+  w?: number;
+  h?: number;
+  selector?: string;
+  /** Offset inside the target element (0–1) for sticky placement. */
+  ox?: number;
+  oy?: number;
+};
 
 type Branding = {
   name: string;
@@ -104,6 +106,113 @@ type SessionInfo = {
     return parts.join(" > ");
   }
 
+  function docSize() {
+    const docW = Math.max(
+      document.documentElement.scrollWidth,
+      document.body?.scrollWidth || 0,
+      1,
+    );
+    const docH = Math.max(
+      document.documentElement.scrollHeight,
+      document.body?.scrollHeight || 0,
+      1,
+    );
+    return { docW, docH };
+  }
+
+  /** Map stored highlight → current viewport pixels (scroll-aware). */
+  function resolveViewportBox(h: PinHighlight): {
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+  } {
+    if (h.selector) {
+      try {
+        const el = document.querySelector(h.selector);
+        if (el) {
+          const r = el.getBoundingClientRect();
+          if (h.type === "pin") {
+            const ox = h.ox ?? 0.5;
+            const oy = h.oy ?? 0.5;
+            return {
+              left: r.left + ox * r.width,
+              top: r.top + oy * r.height,
+              width: 0,
+              height: 0,
+            };
+          }
+          // Rect: prefer document ratios, but if ox/oy present treat x/y as element-relative
+          if (h.ox != null && h.oy != null && h.w != null && h.h != null) {
+            return {
+              left: r.left + h.ox * r.width,
+              top: r.top + h.oy * r.height,
+              width: h.w * r.width,
+              height: h.h * r.height,
+            };
+          }
+        }
+      } catch {
+        /* fall through */
+      }
+    }
+
+    const { docW, docH } = docSize();
+    return {
+      left: h.x * docW - window.scrollX,
+      top: h.y * docH - window.scrollY,
+      width: (h.w || 0) * docW,
+      height: (h.h || 0) * docH,
+    };
+  }
+
+  function capturePinHighlight(
+    clientX: number,
+    clientY: number,
+    target: Element | null,
+  ): PinHighlight {
+    const { docW, docH } = docSize();
+    const pageX = clientX + window.scrollX;
+    const pageY = clientY + window.scrollY;
+    let ox: number | undefined;
+    let oy: number | undefined;
+    if (target && target !== document.body && target !== document.documentElement) {
+      const r = target.getBoundingClientRect();
+      if (r.width > 0 && r.height > 0) {
+        ox = (clientX - r.left) / r.width;
+        oy = (clientY - r.top) / r.height;
+      }
+    }
+    return {
+      type: "pin",
+      x: pageX / docW,
+      y: pageY / docH,
+      selector: cssPath(target),
+      ox,
+      oy,
+    };
+  }
+
+  function captureRectHighlight(
+    clientX: number,
+    clientY: number,
+    clientW: number,
+    clientH: number,
+    target: Element | null,
+  ): PinHighlight {
+    const { docW, docH } = docSize();
+    const pageX = clientX + window.scrollX;
+    const pageY = clientY + window.scrollY;
+    return {
+      type: "rect",
+      x: pageX / docW,
+      y: pageY / docH,
+      w: clientW / docW,
+      h: clientH / docH,
+      selector: cssPath(target),
+    };
+  }
+
   async function validate(token: string): Promise<SessionInfo | null> {
     const url = new URL(`${appOrigin}/api/embed/session`);
     url.searchParams.set("publicKey", publicKey!);
@@ -130,21 +239,22 @@ type SessionInfo = {
       });
       const ctx = canvas.getContext("2d");
       if (ctx) {
+        const box = resolveViewportBox(highlight);
+        const scaleX = canvas.width / Math.max(window.innerWidth, 1);
+        const scaleY = canvas.height / Math.max(window.innerHeight, 1);
         ctx.save();
         ctx.strokeStyle = "#E85D4C";
         ctx.lineWidth = 3;
         if (highlight.type === "pin") {
-          const x = highlight.x * canvas.width;
-          const y = highlight.y * canvas.height;
           ctx.beginPath();
-          ctx.arc(x, y, 14, 0, Math.PI * 2);
+          ctx.arc(box.left * scaleX, box.top * scaleY, 14, 0, Math.PI * 2);
           ctx.stroke();
         } else {
           ctx.strokeRect(
-            highlight.x * canvas.width,
-            highlight.y * canvas.height,
-            (highlight.w || 0) * canvas.width,
-            (highlight.h || 0) * canvas.height,
+            box.left * scaleX,
+            box.top * scaleY,
+            box.width * scaleX,
+            box.height * scaleY,
           );
         }
         ctx.restore();
@@ -329,53 +439,86 @@ type SessionInfo = {
         .forEach((b) => b.classList.remove("active"));
     }
 
+    let focusedPinId: string | null = focusPinIdFromHash();
+    let tipPinId: string | null = null;
+
     function renderPins(focusId?: string | null) {
+      if (focusId !== undefined) focusedPinId = focusId;
       pinsLayer.innerHTML = "";
       tipEl = null;
+
       for (const pin of pins) {
-        const h = pin.highlight;
-        if (h.type === "pin") {
+        const box = resolveViewportBox(pin.highlight);
+        const offscreen =
+          box.top < -80 ||
+          box.left < -80 ||
+          box.top > window.innerHeight + 80 ||
+          box.left > window.innerWidth + 80;
+
+        if (pin.highlight.type === "pin") {
           const marker = document.createElement("div");
-          marker.className = `pin-marker${pin.mine ? " mine" : ""}${focusId === pin.id ? " focused" : ""}`;
-          marker.style.left = `${h.x * 100}%`;
-          marker.style.top = `${h.y * 100}%`;
+          marker.className = `pin-marker${pin.mine ? " mine" : ""}${focusedPinId === pin.id ? " focused" : ""}`;
+          marker.style.left = `${box.left}px`;
+          marker.style.top = `${box.top}px`;
+          marker.style.display = offscreen ? "none" : "";
           marker.title = `${pin.authorName}: ${pin.comment}`;
           marker.addEventListener("click", (e) => {
             e.stopPropagation();
-            showTip(pin, h.x * window.innerWidth, h.y * window.innerHeight);
+            tipPinId = pin.id;
+            showTip(pin, box.left, box.top);
           });
           pinsLayer.appendChild(marker);
-          if (focusId === pin.id) {
-            showTip(pin, h.x * window.innerWidth, h.y * window.innerHeight);
-            window.scrollTo({
-              top: Math.max(0, h.y * document.documentElement.scrollHeight - window.innerHeight / 2),
-              behavior: "smooth",
-            });
-          }
         } else {
           const marker = document.createElement("div");
           marker.className = "rect-marker";
-          marker.style.left = `${h.x * 100}%`;
-          marker.style.top = `${h.y * 100}%`;
-          marker.style.width = `${(h.w || 0) * 100}%`;
-          marker.style.height = `${(h.h || 0) * 100}%`;
+          marker.style.left = `${box.left}px`;
+          marker.style.top = `${box.top}px`;
+          marker.style.width = `${Math.max(box.width, 4)}px`;
+          marker.style.height = `${Math.max(box.height, 4)}px`;
+          marker.style.display = offscreen ? "none" : "";
           marker.title = `${pin.authorName}: ${pin.comment}`;
           marker.addEventListener("click", (e) => {
             e.stopPropagation();
-            showTip(
-              pin,
-              (h.x + (h.w || 0) / 2) * window.innerWidth,
-              h.y * window.innerHeight,
-            );
+            tipPinId = pin.id;
+            showTip(pin, box.left + box.width / 2, box.top);
           });
           pinsLayer.appendChild(marker);
-          if (focusId === pin.id) {
-            showTip(
-              pin,
-              (h.x + (h.w || 0) / 2) * window.innerWidth,
-              h.y * window.innerHeight,
-            );
-          }
+        }
+      }
+
+      if (tipPinId) {
+        const tipPin = pins.find((p) => p.id === tipPinId);
+        if (tipPin) {
+          const box = resolveViewportBox(tipPin.highlight);
+          showTip(
+            tipPin,
+            tipPin.highlight.type === "pin"
+              ? box.left
+              : box.left + box.width / 2,
+            box.top,
+          );
+        }
+      } else if (focusedPinId) {
+        const focusPin = pins.find((p) => p.id === focusedPinId);
+        if (focusPin) {
+          const box = resolveViewportBox(focusPin.highlight);
+          const { docH } = docSize();
+          window.scrollTo({
+            top: Math.max(
+              0,
+              focusPin.highlight.y * docH - window.innerHeight / 2,
+            ),
+            behavior: "smooth",
+          });
+          tipPinId = focusPin.id;
+          showTip(
+            focusPin,
+            focusPin.highlight.type === "pin"
+              ? box.left
+              : box.left + box.width / 2,
+            box.top,
+          );
+          focusedPinId = null;
         }
       }
     }
@@ -388,7 +531,13 @@ type SessionInfo = {
       tipEl.style.top = `${Math.max(40, y)}px`;
       tipEl.innerHTML = `<strong>${escapeHtml(pin.authorName)}</strong>${escapeHtml(pin.comment)}`;
       pinsLayer.appendChild(tipEl);
-      setTimeout(() => tipEl?.remove(), 5000);
+      window.setTimeout(() => {
+        if (tipPinId === pin.id) {
+          tipPinId = null;
+          tipEl?.remove();
+          tipEl = null;
+        }
+      }, 5000);
     }
 
     function escapeHtml(value: string) {
@@ -484,12 +633,7 @@ type SessionInfo = {
           marker.style.left = `${e.clientX}px`;
           marker.style.top = `${e.clientY}px`;
           overlay!.appendChild(marker);
-          const highlight: PinHighlight = {
-            type: "pin",
-            x: e.clientX / window.innerWidth,
-            y: e.clientY / window.innerHeight,
-            selector: cssPath(target),
-          };
+          const highlight = capturePinHighlight(e.clientX, e.clientY, target);
           openComposer(highlight, e.clientX, e.clientY);
         });
       } else {
@@ -523,14 +667,7 @@ type SessionInfo = {
           const cx = x + w / 2;
           const cy = y + h / 2;
           const target = document.elementFromPoint(cx, cy);
-          const highlight: PinHighlight = {
-            type: "rect",
-            x: x / window.innerWidth,
-            y: y / window.innerHeight,
-            w: w / window.innerWidth,
-            h: h / window.innerHeight,
-            selector: cssPath(target),
-          };
+          const highlight = captureRectHighlight(x, y, w, h, target);
           openComposer(highlight, e.clientX, e.clientY);
           dragStart = null;
         });
@@ -649,7 +786,17 @@ type SessionInfo = {
       renderStep();
     }
 
-    window.addEventListener("resize", () => renderPins(focusPinIdFromHash()));
+    let ticking = false;
+    function onScrollOrResize() {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(() => {
+        ticking = false;
+        renderPins();
+      });
+    }
+    window.addEventListener("scroll", onScrollOrResize, { passive: true });
+    window.addEventListener("resize", onScrollOrResize);
     renderPins(focusPinIdFromHash());
     void mode;
 

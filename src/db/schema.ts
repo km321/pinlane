@@ -155,11 +155,16 @@ export const reviewSessions = pgTable(
 
 export type HighlightPayload = {
   type: "pin" | "rect";
+  /** Document-normalized X (0–1 of scrollWidth). */
   x: number;
+  /** Document-normalized Y (0–1 of scrollHeight). */
   y: number;
   w?: number;
   h?: number;
   selector?: string;
+  /** Offset within the selected element (0–1), preferred for sticky placement. */
+  ox?: number;
+  oy?: number;
 };
 
 export const feedbackItems = pgTable("feedback_items", {
