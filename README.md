@@ -33,7 +33,7 @@ App: [http://127.0.0.1:3456](http://127.0.0.1:3456)
 5. Create review links (optional reviewer name per link; as many as you need)  
 6. Work feedback on the board — open a pin on the live page or view its screenshot  
 
-Pin screenshots are captured in the browser (page viewport + drawn pin/highlight) and stored as JPEG data URLs in Postgres (`feedback_items.screenshot_url`). There is no separate object/CDN store yet.
+Pin screenshots are captured in the browser (viewport + drawn pin/highlight), compressed to JPEG (~220KB target), uploaded to a Railway Storage Bucket, and served via `/api/files/…`. Postgres only keeps the URL.
 7. (Optional) Create an API key under **Branding & API keys** for MCP  
 
 Clients never need accounts (magic review links). Named links skip the name form; unnamed links ask once per session. Pins stay visible in the widget after send, with a short first-visit tour (? to replay). Extra agency seats are not open-signup; they stay owner-gated for self-host.
@@ -81,11 +81,12 @@ Pinlane does not store a GitHub PAT. Agents use their own GitHub tools against t
 
 Production: [https://pinlane-production.up.railway.app](https://pinlane-production.up.railway.app)
 
-1. New project → add **Postgres**  
+1. New project → add **Postgres** + a **Storage Bucket** (for pin screenshots)  
 2. Deploy this repo as a web service (Node **22**; `NIXPACKS_NODE_VERSION=22`)  
 3. Set `DATABASE_URL` (from Postgres), `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `NEXT_PUBLIC_APP_URL` to the public URL  
-4. Start command: `npm run start:migrate` (runs Drizzle migrations, then Next on `$PORT`)  
-5. Point the public domain’s **target port** at the same `$PORT` the process listens on (default `8080` on Railway)
+4. Wire bucket refs on the web service: `STORAGE_ENDPOINT`, `STORAGE_BUCKET`, `STORAGE_REGION`, `STORAGE_ACCESS_KEY_ID`, `STORAGE_SECRET_ACCESS_KEY` → `${{YourBucket.ENDPOINT}}` (and matching fields)  
+5. Start command: `npm run start:migrate` (runs Drizzle migrations, then Next on `$PORT`)  
+6. Point the public domain’s **target port** at the same `$PORT` the process listens on (default `8080` on Railway)
 
 First visit: create the owner account on `/signup`. Signup locks after that.
 

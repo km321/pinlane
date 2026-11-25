@@ -238,7 +238,8 @@ type SessionInfo = {
       const host = document.getElementById("pinlane-root");
       // Hide widget chrome so the shot is the real page, then stamp the pin on.
       if (host) host.style.visibility = "hidden";
-      const scale = Math.min(1, 1200 / Math.max(window.innerWidth, 1));
+      // Cap long edge ~1280 CSS px so JPEG stays useful but compact
+      const scale = Math.min(1, 1280 / Math.max(window.innerWidth, 1));
       const canvas = await html2canvas(document.body, {
         useCORS: true,
         allowTaint: true,
@@ -311,19 +312,52 @@ type SessionInfo = {
         ctx.restore();
       }
 
-      const dataUrl = canvas.toDataURL("image/jpeg", 0.62);
-      if (dataUrl.length > 1_400_000) {
-        // Retry more compressed if oversized for Postgres text
-        const smaller = canvas.toDataURL("image/jpeg", 0.4);
-        if (smaller.length > 1_400_000) return undefined;
-        return smaller;
-      }
-      return dataUrl;
+      // Target ~220KB binary (readable for board work, small for upload).
+      return await canvasToCompressedJpeg(canvas, 220_000);
     } catch {
       const host = document.getElementById("pinlane-root");
       if (host) host.style.visibility = "";
       return undefined;
     }
+  }
+
+  function canvasToCompressedJpeg(
+    canvas: HTMLCanvasElement,
+    maxBytes: number,
+  ): Promise<string | undefined> {
+    return new Promise((resolve) => {
+      let quality = 0.78;
+      const attempt = () => {
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) {
+              resolve(undefined);
+              return;
+            }
+            if (blob.size > maxBytes && quality > 0.42) {
+              quality = Math.max(0.42, quality - 0.1);
+              attempt();
+              return;
+            }
+            if (blob.size > maxBytes * 1.6) {
+              // Still huge after quality floor — skip rather than clog the API
+              resolve(undefined);
+              return;
+            }
+            const reader = new FileReader();
+            reader.onload = () =>
+              resolve(
+                typeof reader.result === "string" ? reader.result : undefined,
+              );
+            reader.onerror = () => resolve(undefined);
+            reader.readAsDataURL(blob);
+          },
+          "image/jpeg",
+          quality,
+        );
+      };
+      attempt();
+    });
   }
 
   function mount(token: string, info: SessionInfo) {

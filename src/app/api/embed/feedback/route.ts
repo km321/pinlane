@@ -10,6 +10,7 @@ import {
 import { embedCorsHeaders, optionsResponse } from "@/lib/cors";
 import { createFeedbackWithCard } from "@/lib/tickets";
 import { buildPinDeepLink, pinOpenPath } from "@/lib/branding";
+import { storeScreenshot } from "@/lib/storage";
 
 export function OPTIONS(req: Request) {
   return optionsResponse(req);
@@ -33,7 +34,8 @@ const schema = z.object({
   }),
   screenshotUrl: z
     .string()
-    .max(1_500_000)
+    // data URLs are compressed client-side (~≤400KB); leave headroom
+    .max(800_000)
     .optional()
     .refine(
       (v) => !v || v.startsWith("data:image/") || /^https?:\/\//i.test(v),
@@ -81,6 +83,17 @@ export async function POST(req: Request) {
       );
     }
 
+    let screenshotUrl: string | undefined;
+    if (body.screenshotUrl?.startsWith("data:image/")) {
+      try {
+        screenshotUrl = await storeScreenshot(body.screenshotUrl);
+      } catch {
+        screenshotUrl = undefined;
+      }
+    } else if (body.screenshotUrl) {
+      screenshotUrl = body.screenshotUrl;
+    }
+
     const result = await createFeedbackWithCard({
       projectId: project.id,
       sessionId: session.id,
@@ -90,7 +103,7 @@ export async function POST(req: Request) {
       pageTitle: body.pageTitle,
       comment: body.comment,
       highlight: body.highlight,
-      screenshotUrl: body.screenshotUrl,
+      screenshotUrl,
     });
 
     const appUrl =
