@@ -1,7 +1,10 @@
 import Link from "next/link";
 import { AuthForm } from "@/components/auth-form";
+import { isSignupOpen } from "@/lib/signup-gate";
 
-export default function LoginPage() {
+export default async function LoginPage() {
+  const signupOpen = await isSignupOpen();
+
   return (
     <div className="flex min-h-screen items-center justify-center px-6 py-12">
       <div className="w-full max-w-md rounded-2xl border bg-white/90 p-8 shadow-xl shadow-[#0b1f2a]/5 backdrop-blur">
@@ -13,7 +16,7 @@ export default function LoginPage() {
           Log in to your agency workspace.
         </p>
         <div className="mt-6">
-          <AuthForm mode="login" />
+          <AuthForm mode="login" signupOpen={signupOpen} />
         </div>
       </div>
     </div>

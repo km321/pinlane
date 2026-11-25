@@ -9,7 +9,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-export function AuthForm({ mode }: { mode: "login" | "signup" }) {
+export function AuthForm({
+  mode,
+  signupOpen = true,
+}: {
+  mode: "login" | "signup";
+  signupOpen?: boolean;
+}) {
   const router = useRouter();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -82,7 +88,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
         {loading
           ? "Working…"
           : mode === "signup"
-            ? "Create workspace"
+            ? "Create owner account"
             : "Log in"}
       </Button>
       <p className="text-center text-sm text-muted-foreground">
@@ -93,13 +99,15 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
               Log in
             </Link>
           </>
-        ) : (
+        ) : signupOpen ? (
           <>
-            New here?{" "}
+            First install?{" "}
             <Link href="/signup" className="text-foreground underline">
-              Sign up
+              Create the owner account
             </Link>
           </>
+        ) : (
+          <>Signup is locked on this install. Use the owner login.</>
         )}
       </p>
     </form>

@@ -26,12 +26,14 @@ npm run dev
 
 App: [http://127.0.0.1:3456](http://127.0.0.1:3456)
 
-1. Sign up → workspace is created automatically  
+1. **First signup becomes the owner** — that account owns the agency workspace, then public signup locks  
 2. Create a project with your staging site URL  
 3. Copy the embed snippet onto that site  
 4. Create a review invite and send the link to your client  
 5. Work feedback on the board  
-6. (Optional) Create an API key under **Branding & API keys** for MCP
+6. (Optional) Create an API key under **Branding & API keys** for MCP  
+
+Clients never need accounts (magic review links). Extra agency seats are not open-signup; they stay owner-gated for self-host.
 
 ## Embed snippet
 

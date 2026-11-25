@@ -1,5 +1,4 @@
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import { HomeCta, HomeHeaderActions } from "@/components/home-cta";
 
 export default function HomePage() {
   return (
@@ -17,12 +16,7 @@ export default function HomePage() {
         <div className="font-heading text-2xl font-bold tracking-tight text-[#0b1f2a]">
           Pinlane
         </div>
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" render={<Link href="/login" />}>
-            Log in
-          </Button>
-          <Button render={<Link href="/signup" />}>Start free</Button>
-        </div>
+        <HomeHeaderActions />
       </header>
 
       <main className="relative z-10 mx-auto flex w-full max-w-6xl flex-col px-6 pb-24 pt-10 md:pt-20">
@@ -35,17 +29,11 @@ export default function HomePage() {
               Client feedback on the live page — tracked on your board.
             </h1>
             <p className="mt-4 max-w-lg text-base text-muted-foreground md:text-lg">
-              Embed one script, send a magic review link, and turn every pin
-              into a Kanban card your team (or agents via MCP) can ship against.
+              Self-host friendly: the first signup owns the agency workspace,
+              then signup locks. Embed one script, send a review link, and turn
+              every pin into a Kanban card — with MCP for agents.
             </p>
-            <div className="mt-8 flex flex-wrap gap-3">
-              <Button size="lg" render={<Link href="/signup" />}>
-                Open your workspace
-              </Button>
-              <Button size="lg" variant="outline" render={<Link href="/login" />}>
-                I already have an account
-              </Button>
-            </div>
+            <HomeCta />
           </div>
 
           <div className="relative animate-in fade-in slide-in-from-right-6 duration-1000">
